@@ -69,10 +69,11 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 |---|---|
 | `templates/CLAUDE.md` | the thin root router |
 | `templates/repo-map.md` | the repo registry |
-| `templates/docs/_shared/graphql-contract.md` | shared API spine (GraphQL workspaces) |
-| `templates/docs/_shared/rest-api-contract.md` | shared API spine (REST/DRF workspaces) |
-| `templates/docs/_shared/{env-matrix,auth-model,local-setup,glossary}.md` | cross-repo docs |
+| `templates/docs/_shared/api-contract.md` | shared API spine — **generic, seeded at init** (stack-neutral) |
+| `templates/docs/_shared/graphql-contract.md` | GraphQL seed for the spine (used only if a GraphQL stack is detected) |
+| `templates/docs/_shared/rest-api-contract.md` | REST/DRF seed for the spine (used only if a DRF stack is detected) |
+| `templates/docs/_shared/{env-matrix,auth-model,local-setup,glossary}.md` | cross-repo docs (stack-neutral) |
 | `templates/docs/repo-conventions.md` | per-repo conventions stub |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 
-Keep the API-contract stub matching your workspace (GraphQL **or** REST) and delete the other.
+The contract spine is always the file `docs/_shared/api-contract.md`. `/lodestar-init` seeds it from the **generic** stub (no API-style assumption); `/onboard-repo` may later enrich it from the GraphQL or REST seed **only if** that stack is actually detected and the file is still the untouched generic template. The other shared docs all link to the stable `api-contract.md` name.

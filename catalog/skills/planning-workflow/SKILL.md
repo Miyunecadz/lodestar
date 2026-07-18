@@ -10,7 +10,7 @@ Turn a feature request into a cross-repo plan. You write no code here — the po
 
 **The loop:**
 
-1. Read `docs/_shared/<api>-contract.md` — the API contract is the **spine**. Read `docs/repo-map.md` to see which repos the feature touches and how.
+1. Read `docs/_shared/api-contract.md` — the API contract is the **spine**. Read `docs/repo-map.md` to see which repos the feature touches and how.
 2. **Identify the contract change first.** If the feature moves data across a repo boundary, the shared API surface changes, and that change drives everything else. Plan it before anything else.
 3. Produce a task breakdown: the smallest tasks that each have a crisp done-condition, **tagged by repo and by role** (`migration-writer`, `resolver-writer`, `implementer`, `test-writer`, …), ordered by dependency.
 

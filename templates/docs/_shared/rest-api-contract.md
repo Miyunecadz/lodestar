@@ -1,9 +1,11 @@
 # REST API Contract — the cross-repo spine
 
-<!-- TODO: Rename this file to match your API (e.g. `rest-api-contract.md`, `api-contract.md`).
-     This document lives in `docs/_shared/` because it belongs to NO single repo — it is the
-     system-level truth that links the repos at RUNTIME. Graphify cannot draw this edge
-     (repos talk over the network, not via static imports), so it stays hand-written. -->
+<!-- TODO: This is the REST/DRF seed for the contract spine. `/onboard-repo` copies it to
+     `docs/_shared/api-contract.md` when a DRF stack is detected — keep that filename, the
+     other shared docs link to it. This document lives in `docs/_shared/` because it belongs
+     to NO single repo — it is the system-level truth that links the repos at RUNTIME.
+     Graphify cannot draw this edge (repos talk over the network, not via static imports),
+     so it stays hand-written. -->
 
 ## Overview
 

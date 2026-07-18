@@ -16,5 +16,5 @@
 | <!-- TODO: term --> | <!-- TODO: meaning --> |
 | <!-- TODO: term --> | <!-- TODO: meaning --> |
 
-<!-- TODO: If a term maps to a specific GraphQL type or DB table, link it to
-     graphql-contract.md so the vocabulary and the schema stay in sync. -->
+<!-- TODO: If a term maps to a specific API type/resource or DB table, link it to
+     api-contract.md so the vocabulary and the schema stay in sync. -->

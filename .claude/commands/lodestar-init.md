@@ -23,7 +23,8 @@ Apply their choice. Record it in the manifest.
 - Fill in the **repo registry**: one line per detected repo. Leave the loading-policy section verbatim — it is the discipline that keeps the router thin.
 
 ## 4. Scaffold shared docs
-- Create `docs/_shared/` and copy each template from `.lodestar/templates/docs/_shared/`. These are fill-in stubs; leave TODO markers for the human. Keep the contract stub matching the workspace's API style — `graphql-contract.md` (GraphQL) or `rest-api-contract.md` (REST/DRF) — and delete the other.
+- Create `docs/_shared/` and copy these **stack-neutral** stubs from `.lodestar/templates/docs/_shared/`: `auth-model.md`, `env-matrix.md`, `local-setup.md`, `glossary.md`. These are fill-in stubs; leave TODO markers for the human. Do NOT assume an API style here — no repo has been onboarded yet.
+- Seed the contract spine as `docs/_shared/api-contract.md` from the **generic** `.lodestar/templates/docs/_shared/api-contract.md`. Every other shared doc links to this stable filename. `/onboard-repo` may later enrich it from a stack-specific stub (GraphQL/REST) once a matching stack is actually detected — but only if the file is still the untouched generic template. Do NOT copy `graphql-contract.md` / `rest-api-contract.md` here.
 - Create `docs/repo-map.md` from `.lodestar/templates/repo-map.md`, pre-filled with the detected repos. This is the registry the router points at.
 
 ## 5. Install workspace-wide skills

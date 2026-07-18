@@ -2,64 +2,69 @@
 
 <!-- TODO: This describes authentication and authorization across the whole system.
      It lives in `docs/_shared/` because auth spans every repo: the backend issues,
-     the clients store, and permissions are enforced at the API boundary. -->
+     the clients store, and permissions are enforced at the API boundary. The examples
+     below use a token/JWT flow — replace with your real scheme (session cookies, opaque
+     tokens, OAuth, etc.). -->
 
-## Token type & lifecycle (JWT)
+## Token type & lifecycle
 
-The backend issues a **JWT** on successful login; clients send it on every request; the
-backend verifies it and (via graphql-shield) authorizes each operation.
+The backend issues a credential on successful login; clients send it on every request; the
+backend verifies it and authorizes each operation at the API boundary.
 
-<!-- TODO: Fill in the real lifecycle. -->
+<!-- TODO: Fill in the real lifecycle. Common example shown: a signed JWT. -->
 
-- **Issued by:** <!-- TODO: backend mutation, e.g. `login` / `refreshToken` -->
-- **Signing:** <!-- TODO: algorithm (e.g. HS256/RS256) and where the secret/key lives -->
-- **Claims:** <!-- TODO: e.g. `sub` (user id), `role`, `iat`, `exp` -->
-- **Access token TTL:** <!-- TODO: e.g. 15m / 24h -->
-- **Refresh:** <!-- TODO: refresh-token flow? rotation? revocation/blocklist? -->
-- **Sent as:** <!-- TODO: `Authorization: Bearer <jwt>` header, or cookie — per client below -->
+- **Scheme:** <!-- TODO: e.g. signed JWT / opaque token / session cookie / OAuth -->
+- **Issued by:** <!-- TODO: backend endpoint/operation, e.g. `login` / `refreshToken` -->
+- **Signing / validation:** <!-- TODO: algorithm and where the secret/key lives (JWT), or the session store (cookies) -->
+- **Claims / session data:** <!-- TODO: e.g. `sub` (user id), `role`, `iat`, `exp` -->
+- **Access TTL:** <!-- TODO: e.g. 15m / 24h -->
+- **Refresh / renewal:** <!-- TODO: refresh flow? rotation? revocation/blocklist? -->
+- **Sent as:** <!-- TODO: `Authorization: Bearer <token>` header, or cookie — per client below -->
 
-## Two-factor authentication (2FA)
+## Multi-factor authentication (optional)
 
-TOTP-based, using **speakeasy** on the backend.
+<!-- TODO: If you use MFA/2FA, describe it here; otherwise delete this section.
+     Common example: TOTP via an authenticator app. -->
 
-<!-- TODO: Fill in the real flow. -->
-
-- **Type:** TOTP (authenticator app) via `speakeasy`
-- **Enrollment:** <!-- TODO: generate secret → show QR/otpauth URL → verify first code → store secret -->
-- **Secret storage:** <!-- TODO: where the per-user TOTP secret is stored (encrypted?) -->
-- **Login step:** <!-- TODO: after password, require a valid TOTP code before issuing the full JWT -->
+- **Type:** <!-- TODO: e.g. TOTP (authenticator app) / SMS / WebAuthn -->
+- **Enrollment:** <!-- TODO: generate secret → show QR/otpauth URL → verify first code → store -->
+- **Secret storage:** <!-- TODO: where the per-user MFA secret is stored (encrypted?) -->
+- **Login step:** <!-- TODO: after password, require a valid code before issuing the full credential -->
 - **Recovery:** <!-- TODO: backup codes? admin reset? -->
 
-## Where tokens are stored (per client)
+## Where credentials are stored (per client)
 
-The backend **issues** tokens; each client stores them differently.
+The backend **issues** credentials; each client stores them differently.
+
+<!-- TODO: Replace the example rows with your real clients and storage mechanisms. -->
 
 | Client | Storage mechanism | Notes |
 |---|---|---|
 | Backend | issues, does not store client-side | Signs & verifies; may keep a refresh/revocation store <!-- TODO --> |
-| Frontend (web) | cookies via `js-cookie` | <!-- TODO: cookie name, `Secure`/`SameSite`/`HttpOnly`, expiry, domain per tier --> |
-| Mobile | `@react-native-async-storage/async-storage` | <!-- TODO: key name; consider secure storage for sensitive tokens --> |
+| Web client _(example)_ | cookie or web storage | <!-- TODO: name; `Secure`/`SameSite`/`HttpOnly`, expiry, domain per tier --> |
+| Mobile/other _(example)_ | platform secure storage | <!-- TODO: key name; prefer secure/keychain storage for sensitive tokens --> |
 
-<!-- TODO: Note any XSS/CSRF considerations for the cookie approach, and whether the
-     mobile token should move to secure/keychain storage. -->
+<!-- TODO: Note any XSS/CSRF considerations for the cookie approach, and whether a mobile
+     token should live in secure/keychain storage. -->
 
-## Where permissions are enforced (graphql-shield)
+## Where permissions are enforced
 
-Authorization is enforced **at the API boundary** with **graphql-shield**, not in the
-clients. Clients may hide UI for unavailable actions, but the backend is the gate.
+Authorization is enforced **at the API boundary**, not in the clients. Clients may hide UI
+for unavailable actions, but the backend is the gate.
 
-<!-- TODO: Fill in specifics. -->
+<!-- TODO: Fill in specifics — your framework's authorization layer (middleware, permission
+     classes, a policy/rules module, a gateway, etc.). -->
 
-- **Rules location:** <!-- TODO: path to the shield permissions file -->
+- **Rules location:** <!-- TODO: path to the authorization layer in the backend -->
 - **Default policy:** <!-- TODO: deny-by-default recommended; list public exceptions -->
 - **Role model:** <!-- TODO: the roles that exist and what each can do -->
 
 | Rule | Meaning | Applied to |
 |---|---|---|
-| `isAuthenticated` <!-- example --> | Valid, unexpired JWT present | Most operations |
-| `isAdmin` <!-- example --> | JWT `role` claim is admin | Admin-only operations |
+| `isAuthenticated` <!-- example --> | Valid, unexpired credential present | Most operations |
+| `isAdmin` <!-- example --> | Requester has the admin role | Admin-only operations |
 | `isOwner` <!-- example --> | Requester owns the target resource | Per-resource mutations |
 | <!-- TODO --> | | |
 
-See [`graphql-contract.md`](./graphql-contract.md) for how rules map onto specific
-types/fields, and [`env-matrix.md`](./env-matrix.md) for per-tier cookie domains/endpoints.
+See [`api-contract.md`](./api-contract.md) for how rules map onto specific operations, and
+[`env-matrix.md`](./env-matrix.md) for per-tier cookie domains/endpoints.

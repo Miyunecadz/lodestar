@@ -43,7 +43,13 @@ Report the detected tags. Tags fall into two kinds: **stack tags** (the ecosyste
 
 ## 5. Install matching skills
 For each stack-scoped skill in `.lodestar/catalog/skills/` whose `stacks` intersect the detected tags, copy it into `./.claude/skills/`. Parameterize any `REPO` placeholder in the skill body with the actual repo name and doc paths so its body points at `docs/REPO/…`.
-- Typical mappings: `graphql-apollo-*` → `graphql-contract`, `backend-standards`; `react-craco` → `frontend-standards`; `react-native` → `mobile-standards`.
+- Typical mappings: `graphql-apollo-*` → `graphql-contract`, `backend-standards`; `react-craco` → `frontend-standards`; `react-native` → `mobile-standards`; `drf` → `drf-api-contract`, `django-backend-standards`.
+
+## 5b. Enrich the API-contract spine (only if a matching stack is detected)
+`docs/_shared/api-contract.md` was seeded generic at init. If — and only if — this repo's detected stacks include an API style with a richer stub, offer to replace that file's body with the matching stub, but **only when the file is still the untouched generic template** (never overwrite content a human has filled in):
+- GraphQL (`graphql-apollo-server`/`graphql-apollo-client`) → seed from `.lodestar/templates/docs/_shared/graphql-contract.md`.
+- REST/DRF (`drf`) → seed from `.lodestar/templates/docs/_shared/rest-api-contract.md`.
+Keep the filename `api-contract.md` either way — the cross-links in the other shared docs point at it. If no API-style stack is detected, leave the generic stub as-is and say nothing about GraphQL/REST.
 
 ## 6. Update the map and manifest
 - Append the repo + its detected stacks to `docs/repo-map.md`.
