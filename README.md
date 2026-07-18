@@ -106,6 +106,7 @@ claude
 - [`catalog/README.md`](catalog/README.md) — the catalog entry format.
 - [`catalog/CATALOG.md`](catalog/CATALOG.md) — the grouped index: universal core + stack packs.
 - [`examples/walkthrough.md`](examples/walkthrough.md) — a concrete end-to-end example.
+- [`docs/CI.md`](docs/CI.md) — CI checks, trunk-based release automation, and the branch-protection ruleset.
 
 ## Requirements
 

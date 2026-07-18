@@ -1,0 +1,38 @@
+name: guard-default-branch
+
+# Backstop / detective control for trunk-based development. A workflow cannot *prevent* a
+# push (it runs after the commit lands) — real prevention is the branch ruleset in
+# .github/rulesets/protect-main.json. This fails loudly if a commit reached main WITHOUT a
+# merged pull request (e.g. an admin bypass or a misconfigured ruleset), so it doesn't go
+# unnoticed.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  require-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify HEAD arrived via a merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.sha }}"
+          # Initial commit / repo bootstrap has no PR — allow it.
+          if [ "${{ github.event.created }}" = "true" ]; then
+            echo "Branch just created — skipping PR check."; exit 0
+          fi
+          PRS="$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
+                   -H "Accept: application/vnd.github+json" --jq 'length' 2>/dev/null || echo 0)"
+          if [ "${PRS:-0}" -ge 1 ]; then
+            echo "✅ $SHA is associated with a pull request."
+          else
+            echo "::error::Commit $SHA was pushed to main WITHOUT a pull request."
+            echo "main is trunk-based and protected: open a feature branch and PR instead."
+            echo "If this was an intentional admin bypass, review the branch ruleset."
+            exit 1
+          fi

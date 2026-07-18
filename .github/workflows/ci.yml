@@ -1,0 +1,26 @@
+name: ci
+
+# Gates merges into the default branch. Set this as a required status check in the
+# branch ruleset (see .github/rulesets/protect-main.json).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shellcheck install.sh
+        run: shellcheck --severity=error install.sh
+
+      - name: Validate catalog + version consistency
+        run: python3 .github/scripts/validate.py
+
+      - name: Smoke-test the guardrail engine
+        run: bash .github/scripts/test-engine.sh

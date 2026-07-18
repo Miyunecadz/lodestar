@@ -1,0 +1,61 @@
+name: release
+
+# Trunk-based release automation: when a VERSION bump lands on main, tag it and cut a
+# GitHub Release with notes from the matching CHANGELOG section. No manual tagging.
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+
+permissions:
+  contents: write   # create tags + releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need tags + full history
+
+      - name: Read version
+        id: v
+        run: echo "version=$(cat VERSION | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if tag already exists
+        id: guard
+        run: |
+          if git rev-parse "v${{ steps.v.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${{ steps.v.outputs.version }} already exists — nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog section
+        if: steps.guard.outputs.exists == 'false'
+        run: |
+          python3 - "${{ steps.v.outputs.version }}" > RELEASE_NOTES.md <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md").read()
+          # capture from "## [version]" up to the next "## [" heading
+          m = re.search(r"^##\s*\[" + re.escape(version) + r"\][^\n]*\n(.*?)(?=^##\s*\[|\Z)",
+                        text, re.M | re.S)
+          body = (m.group(1).strip() if m else "").strip()
+          print(body or f"Release {version}.")
+          PY
+          echo "--- notes ---"; cat RELEASE_NOTES.md
+
+      - name: Create tag and GitHub Release
+        if: steps.guard.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.v.outputs.version }}"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes-file RELEASE_NOTES.md \
+            --target "${{ github.sha }}"
