@@ -58,7 +58,7 @@ Add your own tags freely — just detect them in `/onboard-repo` and reference t
 ---
 id: block-edit-applied-migrations
 title: Block edits to applied DB migrations
-category: database            # database | secrets | dependencies | quality | generated
+category: database            # safety | database | secrets | dependencies | quality | generated
 severity: block               # block | warn
 recommended: true
 stacks: [node-dbmate]
