@@ -79,9 +79,9 @@ enforce or generate anything yet.
 ├── .claude/
 │   └── commands/            ← the four generators, now available as slash commands
 │       ├── lodestar-init.md
-│       ├── onboard-repo.md
+│       ├── lodestar-onboard.md
 │       ├── guardrails.md
-│       └── gen-agents.md
+│       └── lodestar-agents.md
 ├── admin-panel-be/          ← untouched
 ├── admin-panel-fe/          ← untouched
 └── mobile/                  ← untouched
@@ -173,16 +173,16 @@ known.
 
 ---
 
-## 4. `/onboard-repo` for each repo
+## 4. `/lodestar-onboard` for each repo
 
 Onboarding is informational and non-destructive: it detects the stack, generates
 the architecture graph, files repo docs, and installs the skills that match the
 detected stack tags. Run it once per repo.
 
-### `/onboard-repo ./admin-panel-be`
+### `/lodestar-onboard ./admin-panel-be`
 
 ```
-> /onboard-repo ./admin-panel-be
+> /lodestar-onboard ./admin-panel-be
 
 Detected stacks: graphql-apollo-server, node-dbmate, redis-queue, has-eslint, has-husky
   apollo-server-express in deps  → graphql-apollo-server
@@ -203,10 +203,10 @@ to `backend-standards`, and `graphql-apollo-server` also pulls in
 to point at `docs/admin-panel-be/…`, so it routes to the right docs without
 copying them.
 
-### `/onboard-repo ./admin-panel-fe`
+### `/lodestar-onboard ./admin-panel-fe`
 
 ```
-> /onboard-repo ./admin-panel-fe
+> /lodestar-onboard ./admin-panel-fe
 
 Detected stacks: react-craco, graphql-apollo-client, has-eslint, has-husky
   @craco/craco in deps   → react-craco
@@ -224,10 +224,10 @@ Installed skills: frontend-standards   (graphql-contract already present — ski
 `graphql-contract`, but that skill is already installed from the backend, so it's
 left as-is — a single source of truth, shared across both consumers.
 
-### `/onboard-repo ./mobile`
+### `/lodestar-onboard ./mobile`
 
 ```
-> /onboard-repo ./mobile
+> /lodestar-onboard ./mobile
 
 Detected stacks: react-native, graphql-apollo-client, has-eslint
   react-native in deps   → react-native
@@ -266,16 +266,16 @@ the runtime contract.
 
 ---
 
-## 5. `/guardrails`
+## 5. `/lodestar-guardrails`
 
-With the stacks known, `/guardrails` turns advisory docs into enforced rules. It
+With the stacks known, `/lodestar-guardrails` turns advisory docs into enforced rules. It
 collects the union of stacks across all onboarded repos, filters the guardrail
 catalog to the ones that apply, and presents a multi-select menu grouped by
 category. Recommended (safety) rules come pre-checked; each option is tagged
 `[block]` or `[warn]`.
 
 ```
-> /guardrails
+> /lodestar-guardrails
 
 Workspace stacks: graphql-apollo-server, node-dbmate, redis-queue,
                   react-craco, graphql-apollo-client, react-native, has-eslint, has-husky
@@ -351,15 +351,15 @@ contain no secrets and are safe to share.
 
 ---
 
-## 6. `/gen-agents`
+## 6. `/lodestar-agents`
 
-`/gen-agents` writes opt-in role workers. Roles are narrow and composable, with
+`/lodestar-agents` writes opt-in role workers. Roles are narrow and composable, with
 a crisp done-condition and a minimal tool profile — breadth stays in the
 orchestrator, not the workers. The menu separates cross-repo roles from
 stack-scoped roles, and pre-checks the recommended ones.
 
 ```
-> /gen-agents
+> /lodestar-agents
 
 Select role agents to generate  (space = toggle, enter = confirm)
 
@@ -592,5 +592,5 @@ setup reproduces elsewhere:
 }
 ```
 
-Adding a fourth repo later is one command — `/onboard-repo ./new-service` — and
+Adding a fourth repo later is one command — `/lodestar-onboard ./new-service` — and
 the router never changes. Map at the top, hands at the bottom.

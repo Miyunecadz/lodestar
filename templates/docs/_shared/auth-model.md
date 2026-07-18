@@ -1,6 +1,6 @@
 # Auth Model
 
-> **How this gets filled:** `/onboard-repo` pre-fills what it can ground in the repo (scheme from the auth dep, where it's enforced, client storage) with a cited basis, and leaves `<!-- TODO: human -->` for the rest (TTLs, rotation, recovery). Confirm the filled values; answer the TODOs.
+> **How this gets filled:** `/lodestar-onboard` pre-fills what it can ground in the repo (scheme from the auth dep, where it's enforced, client storage) with a cited basis, and leaves `<!-- TODO: human -->` for the rest (TTLs, rotation, recovery). Confirm the filled values; answer the TODOs.
 
 <!-- TODO: This describes authentication and authorization across the whole system.
      It lives in `docs/_shared/` because auth spans every repo: the backend issues,

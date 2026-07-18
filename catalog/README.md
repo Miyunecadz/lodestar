@@ -29,7 +29,7 @@ Every catalog entry declares which stacks it applies to and whether it's recomme
 - **`stacks:`** a list of stack tags (see below), or `[all]` for stack-agnostic entries. The picker shows an entry only if the workspace has at least one matching stack.
 - **`recommended:`** `true` pre-checks the entry in the picker menu. Reserve `true` for high-value, low-regret entries (safety guardrails, core roles).
 
-### Stack tags produced by `/onboard-repo`
+### Stack tags produced by `/lodestar-onboard`
 
 | Tag | Detected from |
 |---|---|
@@ -48,7 +48,7 @@ Every catalog entry declares which stacks it applies to and whether it's recomme
 | `has-python-lint` | `ruff` / `black` / `flake8` config or dep |
 | `all` | matches any workspace |
 
-Add your own tags freely — just detect them in `/onboard-repo` and reference them in entries.
+Add your own tags freely — just detect them in `/lodestar-onboard` and reference them in entries.
 
 ---
 

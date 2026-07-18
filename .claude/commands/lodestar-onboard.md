@@ -42,7 +42,7 @@ The "Structure" layer gives the assistant a map to query instead of re-reading s
 
 - **If the `graphify` CLI is available:** run it against the repo and move/copy its outputs (`graph.html`, `GRAPH_REPORT.md`, `graph.json`) into `docs/REPO/architecture/`. This is the richest, deterministic option. Done.
 - **If Graphify is NOT installed:** do not assume. Ask the user (AskUserQuestion) how to proceed, with two options:
-  1. **Install Graphify first, then re-run** *(richest, deterministic)* — Graphify installs entirely at **user level, no sudo**. Show the commands: `uv tool install graphifyy` (or `pipx install graphifyy`), then `graphify install`. Then **pause onboarding** — tell the user to re-run `/onboard-repo $ARGUMENTS` once installed, and stop at this step (still do nothing destructive). Do NOT proceed to later steps in this run.
+  1. **Install Graphify first, then re-run** *(richest, deterministic)* — Graphify installs entirely at **user level, no sudo**. Show the commands: `uv tool install graphifyy` (or `pipx install graphifyy`), then `graphify install`. Then **pause onboarding** — tell the user to re-run `/lodestar-onboard $ARGUMENTS` once installed, and stop at this step (still do nothing destructive). Do NOT proceed to later steps in this run.
   2. **Generate Markdown docs now** *(zero install, works anywhere)* — explore the repo (Glob/Grep/Read; dispatch the Explore agent if available) and write `docs/REPO/architecture/overview.md` by hand: entry points, a module/directory map, the key runtime flows, a mermaid diagram, and a "where to find X" table. This is what the `architecture-overview` skill consumes. It is **not** machine-queryable JSON like Graphify and can drift (re-generate to refresh), but it removes the install burden and needs no external tool.
 - Optionally mention the deterministic middle ground for later: `ast-grep` (`npm i -g @ast-grep/cli`, no sudo) for structural queries across ~20 languages.
 
@@ -65,7 +65,7 @@ As each repo is absorbed, replace the TODOs in `docs/_shared/*` that **this** re
 - **`local-setup.md`** — this repo's prereqs and real install/run/migrate commands (from scripts / `dbmate.yml` / requirements).
 - **`glossary.md`** — candidate domain terms from model/type names; TODO their *meanings* (business semantics — do not guess).
 
-Only fill the slice this repo substantiates; later `/onboard-repo` runs fill their own. Say which fields you filled and from what.
+Only fill the slice this repo substantiates; later `/lodestar-onboard` runs fill their own. Say which fields you filled and from what.
 
 ## 5. Install matching skills
 For each stack-scoped skill in `.lodestar/catalog/skills/` whose `stacks` intersect the detected tags, copy it into `./.claude/skills/`. Parameterize any `REPO` placeholder in the skill body with the actual repo name and doc paths so its body points at `docs/REPO/…`.
@@ -82,4 +82,4 @@ Keep the filename `api-contract.md` either way — the cross-links in the other 
 - Add to `.claude/lodestar.manifest.json` under `repos`: `{ "name": "REPO", "path": "$ARGUMENTS", "stacks": [ ... ] }`. Merge any newly installed skills into `skills`.
 
 ## 7. Report
-Summarize: stacks detected, graph status, docs created, skills installed. Remind the user that enforcement (`/guardrails`) and delegation (`/gen-agents`) are separate opt-in commands they can now run, since the stacks are known.
+Summarize: stacks detected, graph status, docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`) and delegation (`/lodestar-agents`) are separate opt-in commands they can now run, since the stacks are known.

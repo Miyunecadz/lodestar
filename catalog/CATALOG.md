@@ -30,7 +30,7 @@ Totals: **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Dja
 | skill | `planning-workflow` | when scoping/spec'ing, before code |
 | skill | `architecture-overview` | big-picture / cross-repo flow tracing |
 
-> Adaptive picks: `/gen-agents` pre-checks `security-auditor` when a backend/API or `has-auth` is detected, and `ui-designer` + `accessibility-reviewer` when a frontend is detected — even though those last two are frontend-scoped (below). Detection feeds the picker; the catalog stays authoritative.
+> Adaptive picks: `/lodestar-agents` pre-checks `security-auditor` when a backend/API or `has-auth` is detected, and `ui-designer` + `accessibility-reviewer` when a frontend is detected — even though those last two are frontend-scoped (below). Detection feeds the picker; the catalog stays authoritative.
 
 ## ⬡ Node · GraphQL · React · React Native pack
 
@@ -80,7 +80,7 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 | `templates/docs/_shared/rest-api-contract.md` | REST/DRF seed for the spine (used only if a DRF stack is detected) |
 | `templates/docs/_shared/{env-matrix,auth-model,local-setup,glossary}.md` | cross-repo docs (stack-neutral) |
 | `templates/docs/repo-conventions.md` | per-repo conventions stub |
-| `templates/hooks/lodestar-guardrails.py` | the bundled guardrail engine (`/guardrails` copies it to `.claude/hooks/`) |
+| `templates/hooks/lodestar-guardrails.py` | the bundled guardrail engine (`/lodestar-guardrails` copies it to `.claude/hooks/`) |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 
-The contract spine is always the file `docs/_shared/api-contract.md`. `/lodestar-init` seeds it from the **generic** stub (no API-style assumption); `/onboard-repo` may later enrich it from the GraphQL or REST seed **only if** that stack is actually detected and the file is still the untouched generic template. The other shared docs all link to the stable `api-contract.md` name.
+The contract spine is always the file `docs/_shared/api-contract.md`. `/lodestar-init` seeds it from the **generic** stub (no API-style assumption); `/lodestar-onboard` may later enrich it from the GraphQL or REST seed **only if** that stack is actually detected and the file is still the untouched generic template. The other shared docs all link to the stable `api-contract.md` name.

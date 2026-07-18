@@ -5,7 +5,7 @@ Claude Code invokes this as a PreToolUse hook (see .claude/settings.json). It re
 declarative rule files from `.claude/guardrails/*.md` and, for the tool about to run,
 either DENIES it (severity: block) or surfaces an advisory message (severity: warn).
 
-Rule file format (one rule per file, written by `/guardrails`):
+Rule file format (one rule per file, written by `/lodestar-guardrails`):
 
     ---
     name: block-env-files

@@ -56,11 +56,13 @@ Everything self-extends through commands that share one engine: **detect the sta
 | Command | Produces | Destructive? |
 |---|---|---|
 | `/lodestar-init` | the router, `docs/_shared/` skeleton, `repo-map.md` | no |
-| `/onboard-repo <path>` | a repo's docs + architecture map (Graphify graph or Markdown overview) + matching skill | no (informational) |
-| `/guardrails` | opt-in enforced rules (a checklist you tick) | writes rules |
-| `/gen-agents` | opt-in role agents (a checklist you tick) | writes agents |
+| `/lodestar-onboard <path>` | a repo's docs + architecture map (Graphify graph or Markdown overview) + matching skill | no (informational) |
+| `/lodestar-guardrails` | opt-in enforced rules (a checklist you tick) | writes rules |
+| `/lodestar-agents` | opt-in role agents (a checklist you tick) | writes agents |
 
-Add a new repo later? `/onboard-repo ./new-service` and it's absorbed — the router never changes.
+Add a new repo later? `/lodestar-onboard ./new-service` and it's absorbed — the router never changes.
+
+**Updating.** Run **`/lodestar-update`** from the workspace to pull the latest Lodestar and re-sync the kit (catalog, templates, commands, guardrail engine) **without touching anything you generated** — your rules, agents, docs, and manifest are left as-is. New catalog entries appear the next time you re-run `/lodestar-guardrails` or `/lodestar-agents`. (Equivalently: `cd ~/tools/lodestar && git pull && ./install.sh ~/code/my-workspace` — re-running the installer is safe.)
 
 ## Quickstart
 
@@ -76,10 +78,10 @@ git clone https://github.com/Miyunecadz/lodestar.git ~/tools/lodestar
 cd ~/code/my-workspace
 claude
 > /lodestar-init
-> /onboard-repo ./backend
-> /onboard-repo ./frontend
-> /guardrails        # tick the safety + quality rules you want
-> /gen-agents        # tick the role agents you want
+> /lodestar-onboard ./backend
+> /lodestar-onboard ./frontend
+> /lodestar-guardrails        # tick the safety + quality rules you want
+> /lodestar-agents        # tick the role agents you want
 ```
 
 ## Design principles (the short version)
@@ -108,8 +110,8 @@ claude
 ## Requirements
 
 - [Claude Code](https://code.claude.com)
-- Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs — installs at **user level, no sudo** (`uv tool install graphifyy` or `pipx install graphifyy`, then `graphify install`). If it's absent, `/onboard-repo` offers to generate a Markdown `architecture/overview.md` instead, so it's never required.
-- For guardrails: **Python 3** (stdlib only — no packages, no plugin). The engine (`.claude/hooks/lodestar-guardrails.py`) is bundled and installed by `/guardrails`.
+- Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs — installs at **user level, no sudo** (`uv tool install graphifyy` or `pipx install graphifyy`, then `graphify install`). If it's absent, `/lodestar-onboard` offers to generate a Markdown `architecture/overview.md` instead, so it's never required.
+- For guardrails: **Python 3** (stdlib only — no packages, no plugin). The engine (`.claude/hooks/lodestar-guardrails.py`) is bundled and installed by `/lodestar-guardrails`.
 
 ## Cost & model guidance
 
@@ -118,11 +120,11 @@ Lodestar's commands are **deliberately thin** — the intelligence lives in the 
 | Command | What it does | Suggested model | Effort (shipped) |
 |---|---|---|---|
 | `/lodestar-init` | copy templates, write the manifest | Haiku / Sonnet | `low` |
-| `/guardrails` | catalog → rule files + engine | Sonnet | `low` |
-| `/gen-agents` | pick + copy agent files | Sonnet / Haiku | `low` |
-| `/onboard-repo` | detect stack, file docs, install skills | Sonnet | `medium` |
+| `/lodestar-guardrails` | catalog → rule files + engine | Sonnet | `low` |
+| `/lodestar-agents` | pick + copy agent files | Sonnet / Haiku | `low` |
+| `/lodestar-onboard` | detect stack, file docs, install skills | Sonnet | `medium` |
 
-**The one reasoning-heavy step** is generating the Markdown `architecture/overview.md` in `/onboard-repo` *when Graphify isn't installed* — real synthesis of a repo's structure. For that case, use a stronger model (Opus/Sonnet) at `medium`–`high`.
+**The one reasoning-heavy step** is generating the Markdown `architecture/overview.md` in `/lodestar-onboard` *when Graphify isn't installed* — real synthesis of a repo's structure. For that case, use a stronger model (Opus/Sonnet) at `medium`–`high`.
 
 **Biggest budget saver: install Graphify.** It's a local, deterministic tree-sitter tool that costs **~0 model tokens** — it moves that one expensive step off the model entirely. Install it once and every Lodestar command runs cheaply. That saves far more than tuning the model does.
 

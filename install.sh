@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# Lodestar installer — copies the kit into a target workspace.
-# Usage: ./install.sh /path/to/your-workspace
+# Lodestar installer / updater — copies the kit into a target workspace.
+#
+# Usage:
+#   ./install.sh /path/to/your-workspace        # first install, or re-run to update
+#
+# Re-running is SAFE: it refreshes only the kit (catalog, templates, commands, the
+# guardrail engine, VERSION) and NEVER touches anything you generated — your manifest,
+# .claude/guardrails/*, .claude/agents/*, .claude/settings.json, CLAUDE.md, or docs/.
+# Inside a workspace you can also just run /lodestar-update, which pulls the latest
+# source and re-runs this script for you.
 set -euo pipefail
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,41 +19,65 @@ if [ -z "$TARGET" ]; then
   echo "  The workspace is the folder that CONTAINS your repositories."
   exit 1
 fi
-
 if [ ! -d "$TARGET" ]; then
   echo "Target '$TARGET' does not exist. Create it (or pass an existing folder) and retry."
   exit 1
 fi
-
 TARGET="$(cd "$TARGET" && pwd)"
-echo "Installing Lodestar from: $KIT_DIR"
-echo "                     into: $TARGET"
 
-# 1. Catalog + templates go under a hidden .lodestar/ so they don't clutter the workspace.
+MODE="install"
+[ -d "$TARGET/.lodestar" ] && MODE="update"
+echo "Lodestar $MODE"
+echo "  from: $KIT_DIR"
+echo "  into: $TARGET"
+
+# 1. Kit files (catalog + templates) — safe to overwrite wholesale. Remove first so a
+#    re-run replaces rather than nesting (cp -R into an existing dir would nest).
 mkdir -p "$TARGET/.lodestar"
+rm -rf "$TARGET/.lodestar/catalog" "$TARGET/.lodestar/templates"
 cp -R "$KIT_DIR/catalog"   "$TARGET/.lodestar/catalog"
 cp -R "$KIT_DIR/templates" "$TARGET/.lodestar/templates"
 
-# 2. Commands go where Claude Code looks for them.
+# 2. Commands — overwrite the lodestar-* set. Clean up any pre-rename command files.
 mkdir -p "$TARGET/.claude/commands"
-cp "$KIT_DIR/.claude/commands/"*.md "$TARGET/.claude/commands/"
+rm -f "$TARGET/.claude/commands/onboard-repo.md" \
+      "$TARGET/.claude/commands/guardrails.md" \
+      "$TARGET/.claude/commands/gen-agents.md"
+cp "$KIT_DIR/.claude/commands/"lodestar-*.md "$TARGET/.claude/commands/"
 
-# 3. Record the kit version installed.
-if [ -f "$KIT_DIR/VERSION" ]; then
-  cp "$KIT_DIR/VERSION" "$TARGET/.lodestar/VERSION"
+# 3. Guardrail engine — refresh it ONLY if guardrails were already installed (so an update
+#    ships engine fixes). On a fresh workspace, /lodestar-guardrails installs it later.
+if [ -f "$TARGET/.claude/hooks/lodestar-guardrails.py" ]; then
+  cp "$KIT_DIR/templates/hooks/lodestar-guardrails.py" "$TARGET/.claude/hooks/lodestar-guardrails.py"
+  echo "  refreshed the guardrail engine (.claude/hooks/lodestar-guardrails.py)"
 fi
 
-cat <<EOF
+# 4. Record version + source path (so /lodestar-update knows where to pull from).
+[ -f "$KIT_DIR/VERSION" ] && cp "$KIT_DIR/VERSION" "$TARGET/.lodestar/VERSION"
+printf '%s\n' "$KIT_DIR" > "$TARGET/.lodestar/SOURCE"
+
+if [ "$MODE" = "install" ]; then
+  cat <<EOF
 
 ✅ Lodestar installed.
 
 Next steps — from the workspace root ($TARGET):
   cd "$TARGET"
   claude
-  > /lodestar-init                 # create the router, shared docs, repo-map
-  > /onboard-repo ./<each-repo>    # absorb each repo (docs + graph + skills)
-  > /guardrails                    # tick the safety + quality rules you want (enforced)
-  > /gen-agents                    # tick the role agents you want (delegation)
+  > /lodestar-init                  # create the router, shared docs, repo-map
+  > /lodestar-onboard ./<each-repo> # absorb each repo (docs + graph + skills)
+  > /lodestar-guardrails            # tick the safety + quality rules you want (enforced)
+  > /lodestar-agents                # tick the role agents you want (delegation)
 
 Nothing is enforced or generated until you run those commands.
+To update later: run /lodestar-update from the workspace (or re-run this script).
 EOF
+else
+  cat <<EOF
+
+✅ Lodestar kit updated (your generated rules, agents, docs, and manifest were left untouched).
+Version now: $(cat "$TARGET/.lodestar/VERSION" 2>/dev/null || echo "unknown").
+New catalog entries won't apply until you re-run /lodestar-guardrails and /lodestar-agents
+and tick them.
+EOF
+fi

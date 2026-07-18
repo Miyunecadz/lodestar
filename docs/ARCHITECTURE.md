@@ -65,9 +65,9 @@ docs/
 
 ### Layer 3 — Structure (code graph, or a Markdown overview)
 
-[Graphify](https://github.com/Graphify-Labs/graphify) parses code with tree-sitter (deterministic, local, ~40 languages) and emits per repo: an interactive `graph.html`, a `GRAPH_REPORT.md`, and a queryable `graph.json` — explicitly "for querying without re-reading files." That directly serves the original goal: *refer to a map instead of re-reading source over and over.* When present, Graphify **replaces hand-writing** the `architecture/` docs; `/onboard-repo` runs it and files the outputs under `docs/<repo>/architecture/`. Because it is deterministic, re-running it is cheap — that is how Lodestar beats architecture-doc drift.
+[Graphify](https://github.com/Graphify-Labs/graphify) parses code with tree-sitter (deterministic, local, ~40 languages) and emits per repo: an interactive `graph.html`, a `GRAPH_REPORT.md`, and a queryable `graph.json` — explicitly "for querying without re-reading files." That directly serves the original goal: *refer to a map instead of re-reading source over and over.* When present, Graphify **replaces hand-writing** the `architecture/` docs; `/lodestar-onboard` runs it and files the outputs under `docs/<repo>/architecture/`. Because it is deterministic, re-running it is cheap — that is how Lodestar beats architecture-doc drift.
 
-**Graphify is optional — the Structure layer degrades gracefully.** It is not a hard dependency, and it installs entirely at **user level (no sudo)**. If the CLI is absent, `/onboard-repo` asks the user to choose: **(a)** install Graphify (`uv tool install graphifyy` → `graphify install`) and re-run, or **(b)** generate `docs/<repo>/architecture/overview.md` in Markdown right now — entry points, module map, key flows, a mermaid diagram — with no external tool. The Markdown map is less rich and can drift (it isn't a queryable `graph.json`), but it keeps onboarding zero-friction on any machine. Either way the `architecture-overview` skill reads whatever is in `docs/<repo>/architecture/`. (A deterministic middle ground, `ast-grep`, also installs without sudo for structural queries.)
+**Graphify is optional — the Structure layer degrades gracefully.** It is not a hard dependency, and it installs entirely at **user level (no sudo)**. If the CLI is absent, `/lodestar-onboard` asks the user to choose: **(a)** install Graphify (`uv tool install graphifyy` → `graphify install`) and re-run, or **(b)** generate `docs/<repo>/architecture/overview.md` in Markdown right now — entry points, module map, key flows, a mermaid diagram — with no external tool. The Markdown map is less rich and can drift (it isn't a queryable `graph.json`), but it keeps onboarding zero-friction on any machine. Either way the `architecture-overview` skill reads whatever is in `docs/<repo>/architecture/`. (A deterministic middle ground, `ast-grep`, also installs without sudo for structural queries.)
 
 **Important caveat — the cross-repo edge.** Graphify draws *static* edges (imports, calls, inheritance). Repos that talk over an API at **runtime** (e.g. a GraphQL/REST boundary) do **not** import each other's code, so Graphify will not draw that edge. Per-repo graphs are excellent; the **cross-repo spine stays hand-written** in `docs/_shared/api-contract.md`. This is not a bug — it is the correct division between what a parser can know and what only a human can state.
 
@@ -105,7 +105,7 @@ Two design rules:
 
 ## 4. The generator engine (catalog + picker + manifest)
 
-The three generator commands (`/onboard-repo`, `/guardrails`, `/gen-agents`) share one engine:
+The three generator commands (`/lodestar-onboard`, `/lodestar-guardrails`, `/lodestar-agents`) share one engine:
 
 ```
 detect stacks present → filter the catalog to relevant entries →
@@ -119,7 +119,7 @@ write only the chosen entries → record them in the manifest
 
 ### Stack detection (heuristics)
 
-`/onboard-repo` classifies a repo by cheap signals, e.g.:
+`/lodestar-onboard` classifies a repo by cheap signals, e.g.:
 
 | Signal | Stack tag |
 |---|---|
@@ -203,7 +203,7 @@ Choices made during design, with the reasoning, so forks can revisit them delibe
 ## 9. Roadmap
 
 - **v0.1 (initial, unreleased)** — router + four generator commands; catalog with a universal core plus Node·GraphQL·RN and Python·Django packs; core-vs-packs signposting (`catalog/CATALOG.md`); doc & MCP templates; install script.
-- **v0.2 (unreleased)** — stack-neutral universal core; self-contained folder-based guardrail engine (no plugin dependency); adaptive `/guardrails` + `/gen-agents` pickers; Markdown architecture fallback when Graphify is absent; universal security / UI / accessibility / docs agents.
+- **v0.2 (unreleased)** — stack-neutral universal core; self-contained folder-based guardrail engine (no plugin dependency); adaptive `/lodestar-guardrails` + `/lodestar-agents` pickers; Markdown architecture fallback when Graphify is absent; universal security / UI / accessibility / docs agents.
 - **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; CI recipe to refresh Graphify graphs on a schedule.
 
 See [`CONCEPTS.md`](CONCEPTS.md) for the mental models and [`EXTENDING.md`](EXTENDING.md) to add your own catalog entries.

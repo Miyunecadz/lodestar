@@ -1,6 +1,6 @@
 # API Contract — the cross-repo spine
 
-> **How this gets filled:** `/onboard-repo` pre-fills every field it can ground in the repo (deps, routes/resolvers/serializers, the graph) with a cited basis, and leaves `<!-- TODO: human -->` only for what isn't in the code (semantics, deprecation/versioning policy). Confirm the filled values; answer the TODOs.
+> **How this gets filled:** `/lodestar-onboard` pre-fills every field it can ground in the repo (deps, routes/resolvers/serializers, the graph) with a cited basis, and leaves `<!-- TODO: human -->` only for what isn't in the code (semantics, deprecation/versioning policy). Confirm the filled values; answer the TODOs.
 
 <!-- TODO: This is the generic, stack-neutral contract stub. `/lodestar-init` copies the
      stub matching your workspace here as `api-contract.md`:

@@ -9,7 +9,7 @@ You are the Lodestar guardrails installer. Guardrails are **enforced** (determin
 
 ## 1. Load context
 - Read `.claude/lodestar.manifest.json`. Collect the union of all `stacks` across onboarded repos.
-- If there are no repos yet, tell the user to run `/onboard-repo` first and stop.
+- If there are no repos yet, tell the user to run `/lodestar-onboard` first and stop.
 
 ## 2. Build the candidate list
 - Read every entry in `.lodestar/catalog/guardrails/*.md`.

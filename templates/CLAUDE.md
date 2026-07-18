@@ -4,7 +4,7 @@ This folder is a **Lodestar workspace**: several independent repositories coordi
 
 ## Repositories
 
-<!-- One line per repo. Filled in by /lodestar-init and /onboard-repo. -->
+<!-- One line per repo. Filled in by /lodestar-init and /lodestar-onboard. -->
 <!-- e.g. - **backend** — GraphQL API (Node/Apollo/dbmate). See docs/backend/. -->
 
 Full map and cross-repo relationships: **[docs/repo-map.md](docs/repo-map.md)**
@@ -19,8 +19,8 @@ Full map and cross-repo relationships: **[docs/repo-map.md](docs/repo-map.md)**
 
 ## Enforcement
 
-Guardrails (if enabled via `/guardrails`) are **enforced**, not advisory — e.g. applied database migrations cannot be edited; secrets cannot be read. Follow the redirect a blocked action gives you.
+Guardrails (if enabled via `/lodestar-guardrails`) are **enforced**, not advisory — e.g. applied database migrations cannot be edited; secrets cannot be read. Follow the redirect a blocked action gives you.
 
 ## Onboarding a new repo
 
-Run `/onboard-repo ./<new-repo>`. It detects the stack, generates the architecture graph, files docs, and installs matching skills. This router does not need editing — the repo registry above is updated for you.
+Run `/lodestar-onboard ./<new-repo>`. It detects the stack, generates the architecture graph, files docs, and installs matching skills. This router does not need editing — the repo registry above is updated for you.

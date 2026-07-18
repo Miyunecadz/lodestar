@@ -1,7 +1,7 @@
 # <repo> — Conventions
 
 <!-- TODO: One of these per repo, filed at `docs/<repo>/conventions.md`. Hand-written,
-     repo-specific. `/onboard-repo` scaffolds this alongside the GENERATED
+     repo-specific. `/lodestar-onboard` scaffolds this alongside the GENERATED
      `docs/<repo>/architecture/` (Graphify). Keep the human judgment here; leave the
      structural map to the generated graph. Fill from the repo's package.json and code. -->
 
