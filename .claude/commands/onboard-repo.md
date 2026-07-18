@@ -2,6 +2,7 @@
 description: Absorb a repository into the workspace — detect its stack, map its architecture (Graphify or Markdown), file its docs, and install the matching skills.
 argument-hint: <path-to-repo> (e.g. ./backend)
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
+effort: medium   # mostly mechanical, but the Markdown architecture fallback needs real synthesis
 ---
 
 You are onboarding the repository at `$ARGUMENTS` into the Lodestar workspace. This command is **informational and non-destructive** — it adds knowledge, it does not enforce anything. Narrate each step.

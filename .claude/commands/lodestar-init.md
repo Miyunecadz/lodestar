@@ -2,6 +2,7 @@
 description: Initialize Lodestar in the current workspace — create the thin root CLAUDE.md, docs/_shared skeleton, repo-map, and workspace-wide skills.
 argument-hint: (run from the workspace root that contains your repos)
 allowed-tools: Bash, Read, Write, Edit, Glob, AskUserQuestion
+effort: low   # mechanical: copy templates, fill the repo registry, write the manifest
 ---
 
 You are initializing Lodestar in the current workspace. The workspace root is the current directory — it holds several sibling repositories. Lodestar's catalog and templates were installed under `.lodestar/`.

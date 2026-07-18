@@ -111,6 +111,21 @@ claude
 - Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs — installs at **user level, no sudo** (`uv tool install graphifyy` or `pipx install graphifyy`, then `graphify install`). If it's absent, `/onboard-repo` offers to generate a Markdown `architecture/overview.md` instead, so it's never required.
 - For guardrails: **Python 3** (stdlib only — no packages, no plugin). The engine (`.claude/hooks/lodestar-guardrails.py`) is bundled and installed by `/guardrails`.
 
+## Cost & model guidance
+
+Lodestar's commands are **deliberately thin** — the intelligence lives in the catalog and templates, and the commands mostly *detect signals and copy files verbatim*. So they run well on cheap models at low effort; there's little to "reason" about. Each command ships with a conservative `effort:` in its frontmatter (overridable per run), and you can add a `model:` there too — a model outside your org allowlist is ignored gracefully.
+
+| Command | What it does | Suggested model | Effort (shipped) |
+|---|---|---|---|
+| `/lodestar-init` | copy templates, write the manifest | Haiku / Sonnet | `low` |
+| `/guardrails` | catalog → rule files + engine | Sonnet | `low` |
+| `/gen-agents` | pick + copy agent files | Sonnet / Haiku | `low` |
+| `/onboard-repo` | detect stack, file docs, install skills | Sonnet | `medium` |
+
+**The one reasoning-heavy step** is generating the Markdown `architecture/overview.md` in `/onboard-repo` *when Graphify isn't installed* — real synthesis of a repo's structure. For that case, use a stronger model (Opus/Sonnet) at `medium`–`high`.
+
+**Biggest budget saver: install Graphify.** It's a local, deterministic tree-sitter tool that costs **~0 model tokens** — it moves that one expensive step off the model entirely. Install it once and every Lodestar command runs cheaply. That saves far more than tuning the model does.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Built to be copied, published, and made your own.

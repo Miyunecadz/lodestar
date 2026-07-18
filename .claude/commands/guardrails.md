@@ -2,6 +2,7 @@
 description: Pick which guardrails to enforce in this workspace from a stack-aware catalog — safety rules hard-block, quality rules warn.
 argument-hint: (run after onboarding at least one repo)
 allowed-tools: Bash, Read, Write, Edit, Glob, AskUserQuestion
+effort: low   # mechanical: intersect stacks, then copy catalog rule bodies verbatim
 ---
 
 You are the Lodestar guardrails installer. Guardrails are **enforced** (deterministic hooks/permissions), unlike advisory docs. Present a menu, then write only what the user selects. Narrate each step.
