@@ -28,8 +28,11 @@ Classify the repo using these signals (collect ALL that match):
 | `djangorestframework` in deps | `drf` |
 | `pytest` dep or `pytest.ini` / `conftest.py` | `has-pytest` |
 | `ruff` / `black` / `flake8` config or dep | `has-python-lint` |
+| `.gitleaks.toml` / gitleaks or detect-secrets in pre-commit/deps | `has-gitleaks` |
+| `.pre-commit-config.yaml` present | `has-precommit` |
+| prettier config or dep | `has-prettier` |
 
-Report the detected tags. (Extend this table for new stacks as needed — see `docs/EXTENDING.md`.)
+Report the detected tags. Tags fall into two kinds: **stack tags** (the ecosystem — `python-django`, `react-native`) and **capability tags** (a tool is configured — `has-eslint`, `has-gitleaks`). Both feed the pickers identically; capability tags are how a rule adapts to "this repo already uses X." (Extend this table for new stacks/capabilities as needed — see `docs/EXTENDING.md`.)
 
 ## 3. Generate the architecture graph (Graphify)
 - If the `graphify` CLI is available, run it against the repo and move/copy its outputs (`graph.html`, `GRAPH_REPORT.md`, `graph.json`) into `docs/REPO/architecture/`.

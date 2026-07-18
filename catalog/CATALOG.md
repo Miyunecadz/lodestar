@@ -4,7 +4,7 @@ Lodestar's catalog is organized into a **universal core** that works on any stac
 
 > Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../docs/EXTENDING.md`](../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
 
-Totals: **30 entries** — 11 universal · 12 Node·GraphQL·RN · 7 Python·Django.
+Totals: **34 entries** — 15 universal · 12 Node·GraphQL·RN · 7 Python·Django.
 
 ---
 
@@ -12,7 +12,11 @@ Totals: **30 entries** — 11 universal · 12 Node·GraphQL·RN · 7 Python·Dja
 
 | Kind | Entry | Purpose |
 |---|---|---|
+| guardrail | `block-destructive-commands` | block irreversible shell commands (`rm -rf`, `reset --hard`, `DROP …`) |
+| guardrail | `protect-default-branch` | block `git push --force` to a shared branch |
 | guardrail | `block-env-files` | block reading/writing real `.env*` files (secrets) |
+| guardrail | `block-secret-files` | block reading/writing private keys & credential files |
+| guardrail | `scan-secrets-before-commit` | remind to scan the staged diff for hardcoded secrets |
 | guardrail | `no-hand-edit-lockfiles` | block hand-edits to lockfiles across JS/Python/Rust/Go/Ruby/PHP |
 | guardrail | `protect-generated-files` | block edits to generated/binary artifacts |
 | guardrail | `verifier-before-commit` | remind to run the reviewer on the staged diff |
