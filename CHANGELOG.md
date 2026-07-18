@@ -2,6 +2,11 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.2.1] — 2026-07-18
+
+### Added
+- `commit-message-style` guardrail (universal core): one-line commit messages, no `Co-Authored-By` trailer. Ships `warn` / not-recommended (opinionated style); flip to `block` / `recommended: true` to taste. Universal core is now 11 entries (30 total).
+
 ## [0.2.0] — 2026-07-18
 
 ### Added
