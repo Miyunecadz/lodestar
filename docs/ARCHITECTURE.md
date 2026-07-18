@@ -203,6 +203,7 @@ Choices made during design, with the reasoning, so forks can revisit them delibe
 ## 9. Roadmap
 
 - **v0.1 (initial, unreleased)** — router + four generator commands; catalog with a universal core plus Node·GraphQL·RN and Python·Django packs; core-vs-packs signposting (`catalog/CATALOG.md`); doc & MCP templates; install script.
+- **v0.2 (unreleased)** — stack-neutral universal core; self-contained folder-based guardrail engine (no plugin dependency); adaptive `/guardrails` + `/gen-agents` pickers; Markdown architecture fallback when Graphify is absent; universal security / UI / accessibility / docs agents.
 - **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; CI recipe to refresh Graphify graphs on a schedule.
 
 See [`CONCEPTS.md`](CONCEPTS.md) for the mental models and [`EXTENDING.md`](EXTENDING.md) to add your own catalog entries.
