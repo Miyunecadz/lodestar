@@ -1,0 +1,26 @@
+# Lodestar itself ships no secrets. These are guards for workspaces that adopt it.
+
+# --- Secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.local
+.claude/*.local.md
+.claude/settings.local.json
+
+# --- Generated artifacts (Graphify, etc.) ---
+graph.html
+graph.json
+GRAPH_REPORT.md
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
