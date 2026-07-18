@@ -37,7 +37,7 @@ Do NOT copy stack-scoped skills here — those are added per repo by `/onboard-r
 Create `./.claude/lodestar.manifest.json`:
 ```json
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "placement": "<personal|git-workspace>",
   "repos": [],
   "skills": ["planning-workflow", "architecture-overview"],
