@@ -4,7 +4,7 @@ Lodestar's catalog is organized into a **universal core** that works on any stac
 
 > Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../docs/EXTENDING.md`](../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
 
-Totals: **34 entries** — 15 universal · 12 Node·GraphQL·RN · 7 Python·Django.
+Totals: **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Django.
 
 ---
 
@@ -22,11 +22,15 @@ Totals: **34 entries** — 15 universal · 12 Node·GraphQL·RN · 7 Python·Dja
 | guardrail | `verifier-before-commit` | remind to run the reviewer on the staged diff |
 | guardrail | `commit-message-style` | one-line commit messages, no co-author trailer |
 | agent | `reviewer` | read-only staged-diff audit, findings by severity |
+| agent | `security-auditor` | read-only deep security audit (adaptive: backends/APIs) |
+| agent | `docs-writer` | keep docs/ & `_shared/` in sync with code changes |
 | agent | `feature-planner` | decompose a feature into role-sized tasks |
 | agent | `feature-orchestrator` | plan + dispatch specialist roles across repos |
 | agent | `implementer` | cohesive multi-file change bounded to one feature |
 | skill | `planning-workflow` | when scoping/spec'ing, before code |
 | skill | `architecture-overview` | big-picture / cross-repo flow tracing |
+
+> Adaptive picks: `/gen-agents` pre-checks `security-auditor` when a backend/API or `has-auth` is detected, and `ui-designer` + `accessibility-reviewer` when a frontend is detected — even though those last two are frontend-scoped (below). Detection feeds the picker; the catalog stays authoritative.
 
 ## ⬡ Node · GraphQL · React · React Native pack
 
@@ -42,6 +46,8 @@ Detected via `node-dbmate`, `graphql-apollo-server`, `graphql-apollo-client`, `r
 | agent | `resolver-writer` | `graphql-apollo-server` |
 | agent | `test-writer` | `react-native` |
 | agent | `release-runner` | `react-native` |
+| agent | `ui-designer` | `react-craco`, `react-native`, `has-frontend` — loads the `frontend-design` plugin skill |
+| agent | `accessibility-reviewer` | `react-craco`, `react-native`, `has-frontend` — read-only WCAG 2.2 AA audit |
 | skill | `backend-standards` | `graphql-apollo-server`, `node-dbmate` |
 | skill | `graphql-contract` | `graphql-apollo-server`, `graphql-apollo-client` |
 | skill | `frontend-standards` | `react-craco` |

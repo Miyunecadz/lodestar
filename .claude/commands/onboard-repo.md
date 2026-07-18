@@ -32,6 +32,8 @@ Classify the repo using these signals (collect ALL that match):
 | `.gitleaks.toml` / gitleaks or detect-secrets in pre-commit/deps | `has-gitleaks` |
 | `.pre-commit-config.yaml` present | `has-precommit` |
 | prettier config or dep | `has-prettier` |
+| a UI framework present (`react`, `react-native`, `vue`, `svelte`, `@angular/core`) or a components/`.jsx`/`.tsx`/`.vue` tree | `has-frontend` |
+| an auth library present (`jsonwebtoken`, `passport`, `next-auth`, `bcrypt`, `django.contrib.auth`, `djangorestframework-simplejwt`, `devise`, `omniauth`) | `has-auth` |
 
 Report the detected tags. Tags fall into two kinds: **stack tags** (the ecosystem — `python-django`, `react-native`) and **capability tags** (a tool is configured — `has-eslint`, `has-gitleaks`). Both feed the pickers identically; capability tags are how a rule adapts to "this repo already uses X." (Extend this table for new stacks/capabilities as needed — see `docs/EXTENDING.md`.)
 
