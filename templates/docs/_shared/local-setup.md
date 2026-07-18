@@ -1,5 +1,7 @@
 # Local Setup — run the whole system
 
+> **How this gets filled:** `/onboard-repo` pre-fills the real prereqs and install/run/migrate commands it can read from each repo (scripts, `dbmate.yml`, requirements), and leaves `<!-- TODO: human -->` for version pins and gotchas. Confirm the filled commands; answer the TODOs.
+
 <!-- TODO: This is the runbook to bring the ENTIRE system up locally, in order.
      It lives in `docs/_shared/` because it spans every repo. Replace command
      placeholders with the real ones for your workspace, and add/remove sections to

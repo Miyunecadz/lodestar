@@ -48,8 +48,24 @@ The "Structure" layer gives the assistant a map to query instead of re-reading s
 
 Record which path was taken (graphify / markdown / deferred) so a later re-run is unambiguous.
 
-## 4. File repo docs
-- Create `docs/REPO/conventions.md` from `.lodestar/templates/docs/repo-conventions.md` if present, else a short stub with TODO markers (build/run commands, lint, test, notable patterns). Pre-fill anything you can read from `package.json` scripts.
+## 4. File repo docs — pre-fill from evidence, TODO only the unknowable
+Create `docs/REPO/conventions.md` from `.lodestar/templates/docs/repo-conventions.md` (else a short stub). Then **actively fill it in from what you just read** — do not leave a field TODO when the repo already answers it.
+
+**The rule for every doc you touch (per-repo *and* the shared docs below): two tiers.**
+- **Derivable from the repo → fill it, with a cited basis.** Anything you can ground in a concrete source — `package.json`/`requirements`/`pyproject` (deps, scripts), config files, `.env.example` (variable *names*), routes/resolvers/serializers/models, `dbmate.yml`, the Graphify graph. Write the value and note where it came from (e.g. `Scheme: JWT — from djangorestframework-simplejwt`).
+- **Not in the code, or a guess → leave `<!-- TODO: human — ... -->`.** Runtime/tribal/risky facts: token TTLs & rotation, staging/prod URLs, secret-manager name, deprecation windows, the *business meaning* of a domain term, "why" decisions. **Never invent these** — a confidently-wrong doc is worse than an honest TODO.
+
+Pre-fill `docs/REPO/conventions.md`: build/run/lint/test commands (from scripts), notable patterns and entry points (from the code/graph). Leave TODO only for judgment calls.
+
+## 4b. Enrich the shared `_shared/` docs from this repo's evidence
+As each repo is absorbed, replace the TODOs in `docs/_shared/*` that **this** repo now answers (same two-tier rule; never overwrite a human's filled-in value):
+- **`api-contract.md`** — style/transport (apollo→GraphQL, DRF→REST), served-by/consumed-by (this repo's role), the concrete endpoints/resources/operations (from routes/resolvers/serializers or the graph).
+- **`auth-model.md`** — scheme (from the auth dep: `jsonwebtoken`/`passport`/`simplejwt`/`django.contrib.auth`), where it's enforced (middleware / DRF permission classes / shield), where the client stores it (from the frontend deps). TODO the TTLs, rotation, recovery.
+- **`env-matrix.md`** — the config mechanism this repo uses and the variable **names** from its `.env.example`; the dev endpoint. TODO the staging/prod URLs and secret store.
+- **`local-setup.md`** — this repo's prereqs and real install/run/migrate commands (from scripts / `dbmate.yml` / requirements).
+- **`glossary.md`** — candidate domain terms from model/type names; TODO their *meanings* (business semantics — do not guess).
+
+Only fill the slice this repo substantiates; later `/onboard-repo` runs fill their own. Say which fields you filled and from what.
 
 ## 5. Install matching skills
 For each stack-scoped skill in `.lodestar/catalog/skills/` whose `stacks` intersect the detected tags, copy it into `./.claude/skills/`. Parameterize any `REPO` placeholder in the skill body with the actual repo name and doc paths so its body points at `docs/REPO/…`.

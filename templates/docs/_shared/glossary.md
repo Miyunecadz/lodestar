@@ -1,5 +1,7 @@
 # Glossary
 
+> **How this gets filled:** `/onboard-repo` proposes candidate terms from model/type names, but leaves their *meanings* as `<!-- TODO: human -->` — business semantics are not in the code and must not be guessed. Fill in the meanings.
+
 <!-- TODO: Domain vocabulary shared across all repos. Keep terms here when the same word
      must mean the same thing in the backend, frontend, and mobile. This lives in
      `docs/_shared/` because the language belongs to the system, not one repo.

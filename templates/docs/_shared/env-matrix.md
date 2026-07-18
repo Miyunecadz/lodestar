@@ -1,5 +1,7 @@
 # Environment Matrix
 
+> **How this gets filled:** `/onboard-repo` pre-fills what it can ground in the repo (config mechanism, variable *names* from `.env.example`, the dev endpoint) with a cited basis, and leaves `<!-- TODO: human -->` for staging/prod URLs and the secret store. Never put secret *values* here.
+
 <!-- TODO: This maps each environment tier to its config across all repos. It lives in
      `docs/_shared/` because environments span the whole system, not one repo. Replace the
      example mechanisms below with the ones your repos actually use. -->
