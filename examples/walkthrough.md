@@ -579,7 +579,7 @@ setup reproduces elsewhere:
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "placement": "personal",
   "repos": [
     { "name": "admin-panel-be", "path": "./admin-panel-be", "stacks": ["graphql-apollo-server", "node-dbmate", "redis-queue", "has-eslint", "has-husky"] },

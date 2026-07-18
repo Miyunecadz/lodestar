@@ -2,6 +2,17 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.3.0] — Unreleased
+
+Distribution & updatability pass — Lodestar is now branded, collision-safe, and updatable in place (no more delete-and-re-clone).
+
+### Added
+- **`/lodestar-update`** — pulls the latest source and re-syncs the kit (catalog, templates, commands, guardrail engine) **without touching anything you generated** (rules, agents, docs, manifest). Reports new catalog entries to adopt.
+- **Re-runnable installer** — `install.sh` is now idempotent (no directory nesting), refreshes an already-installed guardrail engine, cleans up pre-rename command files, and records the source path + version so updates are a one-command re-sync.
+
+### Changed
+- **Branded, collision-safe commands** — namespaced under a `lodestar-` prefix: `/onboard-repo` → `/lodestar-onboard`, `/guardrails` → `/lodestar-guardrails`, `/gen-agents` → `/lodestar-agents` (`/lodestar-init` unchanged). Avoids clashing with other tools' commands. Existing installs pick up the rename on the next `/lodestar-update`.
+
 ## [0.2.0] — Unreleased
 
 Architecture, portability, and adaptivity pass over the 0.1.0 baseline. Catalog now **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Django.
@@ -15,8 +26,6 @@ Architecture, portability, and adaptivity pass over the 0.1.0 baseline. Catalog 
 - **Evidence-based doc pre-fill** — `/lodestar-onboard` now fills the per-repo and `_shared/` docs from *cited* repo evidence (deps, routes/resolvers/serializers, `.env.example`, the graph) and leaves `TODO` only for the genuinely unknowable (TTLs, prod URLs, domain semantics, "why"), instead of dropping blank stubs. Never invents — a wrong doc is worse than an honest TODO.
 
 ### Changed
-- **Branded, collision-safe commands** — namespaced under a `lodestar-` prefix: `/onboard-repo` → `/lodestar-onboard`, `/guardrails` → `/lodestar-guardrails`, `/gen-agents` → `/lodestar-agents` (`/lodestar-init` unchanged). Avoids clashing with other tools' commands.
-- **Updater + re-runnable installer** — new **`/lodestar-update`** pulls the latest source and re-syncs the kit (catalog, templates, commands, guardrail engine) **without touching generated content** (rules, agents, docs, manifest). `install.sh` is now safely re-runnable (idempotent, no nesting), refreshes an already-installed engine, and records the source path + version so updates don't require a delete-and-re-clone.
 - **Stack-neutral universal core** — shared docs no longer assume GraphQL. The contract spine is a single stable `docs/_shared/api-contract.md`, seeded generic at init and enriched to GraphQL/REST only when that stack is actually detected. `repo-map`, `auth-model`, `env-matrix`, `local-setup`, and `glossary` de-GraphQL'd.
 - Renamed the guardrail emit keyword `emits: hookify` → `emits: rule`.
 
@@ -43,5 +52,6 @@ Initial version — not yet published.
 - Thin `CLAUDE.md` router, `_shared/` doc stubs (GraphQL + REST API contract, env matrix, auth, runbook, glossary), `repo-map.md`, per-repo conventions, per-workspace MCP configs.
 - `.claude/lodestar.manifest.json` reproducible lockfile; `install.sh`; docs (`ARCHITECTURE`, `CONCEPTS`, `EXTENDING`) and an end-to-end example.
 
+[0.3.0]: https://github.com/Miyunecadz/lodestar
 [0.2.0]: https://github.com/Miyunecadz/lodestar
 [0.1.0]: https://github.com/Miyunecadz/lodestar
