@@ -10,8 +10,8 @@ Everything in Lodestar is a plain file. Adding capability means adding a catalog
 2. Edit the frontmatter:
    - `severity: block` for safety (hard stop), `warn` for quality (informational).
    - `stacks:` — which stacks it applies to, or `[all]`.
-   - `event` + `pattern` — the hookify trigger (`file` events match edited paths; `bash` events match commands).
-   - `emits: hookify` for declarative rules; `emits: settings-hook` only if it needs custom shell logic.
+   - `event` + `pattern` — the engine trigger (`file` events match the edited path; `bash` events match the command).
+   - `emits: rule` for declarative rules (enforced by the bundled engine); `emits: settings-hook` only if it needs custom shell logic.
 3. Write a message body that **redirects to the right action**, not just "denied."
 4. Re-run `/guardrails` and tick your new rule.
 
@@ -27,11 +27,13 @@ recommended: false
 stacks: [all]
 event: bash
 pattern: 'git commit'
-emits: hookify
+emits: rule
 ---
 You appear to be committing on a protected branch. Create a feature branch first:
 `git switch -c feat/<name>`.
 ```
+
+The picker writes this to `.claude/guardrails/warn-direct-main-edits.md`; the bundled engine (`.claude/hooks/lodestar-guardrails.py`) picks it up on the next tool call — no restart, no plugin.
 
 ## Add an agent role
 

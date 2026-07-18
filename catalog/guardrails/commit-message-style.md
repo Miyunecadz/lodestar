@@ -7,7 +7,7 @@ recommended: false
 stacks: [all]
 event: bash
 pattern: 'git commit'
-emits: hookify
+emits: rule
 ---
 
 Keep commit messages to a **single line** — a concise subject, no body — and do **not** append a `Co-Authored-By:` trailer (or other trailers). If a `-m` message spans multiple lines or adds a co-author, rewrite it as one line before committing.

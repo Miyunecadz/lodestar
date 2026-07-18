@@ -62,16 +62,16 @@ category: database            # safety | database | secrets | dependencies | qua
 severity: block               # block | warn
 recommended: true
 stacks: [node-dbmate]
-event: file                   # hookify event: file | bash | stop | prompt | all
+event: file                   # engine event: file (matches edited path) | bash (matches command)
 pattern: 'db/migrations/.*\.sql$'   # regex the event is matched against
-emits: hookify                # hookify | settings-hook
+emits: rule                   # rule | settings-hook
 ---
 
 Message shown to Claude when the rule fires. Explain WHAT is blocked and,
 crucially, WHAT TO DO INSTEAD. A good guardrail teaches the right action.
 ```
 
-The picker writes `emits: hookify` entries to `.claude/hookify.<id>.local.md` (with `enabled: true`), and `emits: settings-hook` entries into `.claude/settings.json` hooks.
+The picker writes `emits: rule` entries to `.claude/guardrails/<id>.md` (with `enabled: true`), enforced by Lodestar's self-contained engine (`.claude/hooks/lodestar-guardrails.py`, registered as a PreToolUse hook — no external plugin). `emits: settings-hook` entries go straight into `.claude/settings.json` hooks and are reserved for rules needing shell logic (e.g. a per-repo lint router).
 
 ## Agent entry format (`catalog/agents/<id>.md`)
 

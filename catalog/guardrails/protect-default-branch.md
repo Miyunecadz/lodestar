@@ -7,7 +7,7 @@ recommended: true
 stacks: [all]
 event: bash
 pattern: '\bgit\s+push\b[^|;&]*(\s-f\b|--force(?!-with-lease))'
-emits: hookify
+emits: rule
 ---
 
 A plain `git push --force` (or `-f`) to a shared branch overwrites remote history and can erase teammates' commits. Never force-push to `main`/`master` or any shared branch. If you genuinely need to overwrite your OWN feature branch after a rebase, use `git push --force-with-lease` (which refuses if someone else pushed in the meantime) — never bare `--force`.

@@ -7,7 +7,7 @@ recommended: true
 stacks: [all]
 event: bash
 pattern: '(\brm\s+-[a-zA-Z]*[rf]|\bgit\s+reset\s+--hard|\bgit\s+clean\s+-[a-zA-Z]*f|\bgit\s+(checkout|restore)\s+(--\s+)?\.|\bdd\s+if=|\bmkfs\b|\bshred\b|\btruncate\s+-s|\bDROP\s+(DATABASE|TABLE|SCHEMA)|>\s*/dev/(sd|nvme|disk))'
-emits: hookify
+emits: rule
 ---
 
 This command is irreversible and destroys work with no undo (`rm -rf`, `git reset --hard`, `git clean -fdx`, `git checkout/restore .`, `dd`, `mkfs`, `shred`, `truncate`, `DROP DATABASE/TABLE`, writing to a raw device). STOP and confirm intent with the user before running it, and prefer a recoverable alternative first:

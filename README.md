@@ -28,7 +28,8 @@ your-workspace/                 ← launch Claude Code from here
 │   ├── skills/                 ← knowledge that loads only when the task matches
 │   ├── agents/                 ← opt-in role workers you delegate to
 │   ├── commands/               ← the generators (see below)
-│   └── *.local.md              ← opt-in guardrails (enforced, not advisory)
+│   ├── hooks/                  ← the bundled guardrail engine (lodestar-guardrails.py)
+│   └── guardrails/             ← opt-in guardrail rules (enforced, not advisory)
 ├── backend/                    ← untouched, still its own git repo
 ├── frontend/                   ← untouched
 └── mobile/                     ← untouched
@@ -43,7 +44,7 @@ Lodestar is deliberately layered. Each layer is optional and does exactly one jo
 | **1. Router** | thin root `CLAUDE.md` | every session (tiny) | — |
 | **2. Knowledge** | `docs/` + on-demand **skills** | when the task matches a skill's `description` | advisory |
 | **3. Structure** | **Graphify** code graph per repo (or a Markdown `overview.md` if Graphify isn't installed) | queried on demand | advisory |
-| **4. Guardrails** | **hookify** rules + settings hooks | deterministically, on every matching action | **enforced** |
+| **4. Guardrails** | `.claude/guardrails/*.md` rules + a bundled engine (+ settings hooks) | deterministically, on every matching action | **enforced** |
 | **5. Delegation** | role-based **agents** | when you (or an orchestrator) delegate | advisory |
 
 The golden rule: **docs make the AI *informed*; guardrails make it *trustworthy*.** Use knowledge/skills for judgment and style; use guardrails for anything where a mistake has real cost (database migrations, secrets, generated files).
@@ -108,7 +109,7 @@ claude
 
 - [Claude Code](https://code.claude.com)
 - Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs — installs at **user level, no sudo** (`uv tool install graphifyy` or `pipx install graphifyy`, then `graphify install`). If it's absent, `/onboard-repo` offers to generate a Markdown `architecture/overview.md` instead, so it's never required.
-- Optional: [hookify](https://github.com/anthropics/claude-code) plugin for the declarative guardrail rules
+- For guardrails: **Python 3** (stdlib only — no packages, no plugin). The engine (`.claude/hooks/lodestar-guardrails.py`) is bundled and installed by `/guardrails`.
 
 ## License
 

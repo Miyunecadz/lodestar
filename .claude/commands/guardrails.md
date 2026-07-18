@@ -31,13 +31,33 @@ Use AskUserQuestion with **multiSelect: true**. One question per category (or a 
 
 Make clear: **block** rules stop the action and redirect; **warn** rules inform without stopping.
 
-## 4. Write the selected rules
+## 4. Install the guardrail engine (once)
+Lodestar enforces `emits: rule` guardrails with its own **self-contained engine** — no external plugin. Ensure these exist:
+- Copy `.lodestar/templates/hooks/lodestar-guardrails.py` to `.claude/hooks/lodestar-guardrails.py` (create `.claude/hooks/` if absent). Make it executable (`chmod +x`).
+- Register it in `.claude/settings.json` as a **PreToolUse** hook (create the file / `hooks` key if absent; do not duplicate if already present):
+  ```json
+  {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|Edit|Write|MultiEdit",
+          "hooks": [
+            { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-guardrails.py\"" }
+          ]
+        }
+      ]
+    }
+  }
+  ```
+The engine reads every rule in `.claude/guardrails/*.md` on each matching tool call: `block` rules deny the action (with the redirect message); `warn` rules surface the message without stopping. `file` rules match the edited **path**; `bash` rules match the **command**.
+
+## 5. Write the selected rules — into the `.claude/guardrails/` folder
 For each chosen entry:
-- If `emits: hookify`: write `.claude/hookify.<id>.local.md` with frontmatter `name`, `enabled: true`, `event`, `pattern`, and the message body from the catalog entry. Preserve `severity` semantics (a `block` rule must instruct hard refusal + the correct alternative; a `warn` rule advises).
-- If `emits: settings-hook`: add the corresponding hook to `.claude/settings.json` (create the file/`hooks` key if absent). Use this only for rules needing custom logic (e.g. a per-repo lint router that maps an edited path to that repo's linter).
+- If `emits: rule`: write `.claude/guardrails/<id>.md` with frontmatter `name: <id>`, `enabled: true`, `event`, `pattern`, `severity` (`block`/`warn`), and the message body from the catalog entry — copied verbatim (a `block` message must redirect to the correct alternative, not just deny). Keeping one rule per file in this folder is the whole point: `.claude/` root stays clean.
+- If `emits: settings-hook`: add the corresponding hook to `.claude/settings.json` directly (e.g. a per-repo lint **router** that must run a linter after an edit — that needs shell logic the declarative engine doesn't do). This is the only case that still writes into `settings.json` beyond the engine registration above.
 
-Never write secrets. These files are meant to be safe to share (the actual `.local.md` suffix keeps them out of version control by default).
+Never write secrets into any rule file — they hold patterns and guidance only, and are safe to commit and share.
 
-## 5. Update the manifest & report
+## 6. Update the manifest & report
 - Set `.claude/lodestar.manifest.json` `guardrails` to the enabled ids.
-- Report what was enabled, grouped by block vs warn. Explain how to disable one (set `enabled: false` in its `.local.md`, or re-run this command and untick it).
+- Report what was enabled, grouped by block vs warn, and note that rules live in `.claude/guardrails/` enforced by `.claude/hooks/lodestar-guardrails.py`. Explain how to disable one: set `enabled: false` in its `.claude/guardrails/<id>.md` (or delete the file), or re-run this command and untick it. Changes take effect on the next tool call — no restart.

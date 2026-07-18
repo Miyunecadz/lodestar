@@ -87,7 +87,7 @@ A doc saying "don't edit applied migrations" *will* eventually be violated — n
 - **Safety rules hard-block** — migrations, secrets, generated files. The block message *redirects* to the right action (e.g. "create a new migration with `db:new`") rather than merely failing.
 - **Quality rules warn** — lint-on-edit, style — so they inform without halting flow.
 
-Guardrails are **opt-in via a picker** (Layer's generator, §4). Auto-applying them would be presumptuous; every team wants a different subset. Most rules are emitted as declarative **hookify** files (`.claude/hookify.<name>.local.md`) because those are portable; the few needing custom logic (e.g. a per-repo lint router) are emitted as `settings.json` hooks.
+Guardrails are **opt-in via a picker** (Layer's generator, §4). Auto-applying them would be presumptuous; every team wants a different subset. Most rules are emitted as declarative files under **`.claude/guardrails/<name>.md`**, enforced by Lodestar's own self-contained engine (`.claude/hooks/lodestar-guardrails.py`, a PreToolUse hook — **no external plugin dependency**). `block` rules deny the action and redirect; `warn` rules advise. The few rules needing custom shell logic (e.g. a per-repo lint router) are emitted as `settings.json` hooks instead.
 
 ### Layer 5 — Delegation (role-based agents)
 
@@ -175,7 +175,7 @@ Lodestar itself (this repo) is always a normal git repo — it is the kit. The c
 - **Skill/agent discovery depends on `description` quality.** Vague triggers load the wrong thing or nothing. This is the real ongoing maintenance cost.
 - **Docs drift.** Graphify fights it for *structure*; hand-written `_shared/` docs still need refreshing. Generated ≠ maintained.
 - **Complexity budget.** Five layers is a lot. Adopt them in order; add agents last, and only the ones you will actually delegate to.
-- **Portability limits.** Declarative hookify rules travel well; any rule needing a shell script (the lint router) is the least portable part — keep those clearly marked.
+- **Portability limits.** Declarative guardrail rules (`.claude/guardrails/*.md` + the bundled engine) travel well and are self-contained; any rule needing a shell script (the lint router) is the least portable part — keep those clearly marked.
 - **Generator quality.** Auto-generated "best practices" tend to be generic. The high-value docs (architecture rationale, gotchas, why-not-X) still need a human. Treat generators as bootstrap + refresh, then curate.
 
 ---
