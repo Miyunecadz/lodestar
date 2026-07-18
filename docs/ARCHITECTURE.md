@@ -46,7 +46,7 @@ Two sub-parts:
 ```
 docs/
 ├── _shared/                 # belongs to NO single repo — the cross-cutting truth
-│   ├── <api>-contract.md    # the spine: the contract every repo agrees on
+│   ├── api-contract.md      # the spine: the contract every repo agrees on
 │   ├── env-matrix.md        # environment tiers and which config maps where
 │   ├── auth-model.md        # auth / permissions spanning all repos
 │   ├── local-setup.md       # run the whole system locally (the runbook)
