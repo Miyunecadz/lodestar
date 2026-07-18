@@ -65,7 +65,8 @@ Add a new repo later? `/onboard-repo ./new-service` and it's absorbed — the ro
 
 ```bash
 # 1. Clone Lodestar somewhere
-git clone <your-fork> ~/tools/lodestar
+git clone https://github.com/Miyunecadz/lodestar.git ~/tools/lodestar
+# (or via SSH: git clone git@github.com:Miyunecadz/lodestar.git ~/tools/lodestar)
 
 # 2. Install it into a workspace that contains your repos
 ~/tools/lodestar/install.sh ~/code/my-workspace
