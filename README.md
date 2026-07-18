@@ -23,7 +23,7 @@ your-workspace/                 ← launch Claude Code from here
 ├── CLAUDE.md                   ← thin router: repo registry + "load on demand"
 ├── docs/
 │   ├── _shared/                ← cross-repo truth (the API contract, env tiers, auth…)
-│   └── <repo>/architecture/    ← auto-generated code graph (Graphify)
+│   └── <repo>/architecture/    ← code graph (Graphify) or a Markdown overview.md
 ├── .claude/
 │   ├── skills/                 ← knowledge that loads only when the task matches
 │   ├── agents/                 ← opt-in role workers you delegate to
@@ -42,7 +42,7 @@ Lodestar is deliberately layered. Each layer is optional and does exactly one jo
 |---|---|---|---|
 | **1. Router** | thin root `CLAUDE.md` | every session (tiny) | — |
 | **2. Knowledge** | `docs/` + on-demand **skills** | when the task matches a skill's `description` | advisory |
-| **3. Structure** | **Graphify** code graph per repo | queried on demand | advisory |
+| **3. Structure** | **Graphify** code graph per repo (or a Markdown `overview.md` if Graphify isn't installed) | queried on demand | advisory |
 | **4. Guardrails** | **hookify** rules + settings hooks | deterministically, on every matching action | **enforced** |
 | **5. Delegation** | role-based **agents** | when you (or an orchestrator) delegate | advisory |
 
@@ -55,7 +55,7 @@ Everything self-extends through commands that share one engine: **detect the sta
 | Command | Produces | Destructive? |
 |---|---|---|
 | `/lodestar-init` | the router, `docs/_shared/` skeleton, `repo-map.md` | no |
-| `/onboard-repo <path>` | a repo's docs + Graphify graph + matching skill | no (informational) |
+| `/onboard-repo <path>` | a repo's docs + architecture map (Graphify graph or Markdown overview) + matching skill | no (informational) |
 | `/guardrails` | opt-in enforced rules (a checklist you tick) | writes rules |
 | `/gen-agents` | opt-in role agents (a checklist you tick) | writes agents |
 
@@ -107,7 +107,7 @@ claude
 ## Requirements
 
 - [Claude Code](https://code.claude.com)
-- Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs (`uv tool install graphifyy` or `pipx install`)
+- Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs — installs at **user level, no sudo** (`uv tool install graphifyy` or `pipx install graphifyy`, then `graphify install`). If it's absent, `/onboard-repo` offers to generate a Markdown `architecture/overview.md` instead, so it's never required.
 - Optional: [hookify](https://github.com/anthropics/claude-code) plugin for the declarative guardrail rules
 
 ## License

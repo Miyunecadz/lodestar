@@ -1,7 +1,7 @@
 ---
-description: Absorb a repository into the workspace — detect its stack, generate its architecture graph (Graphify), file its docs, and install the matching skills.
+description: Absorb a repository into the workspace — detect its stack, map its architecture (Graphify or Markdown), file its docs, and install the matching skills.
 argument-hint: <path-to-repo> (e.g. ./backend)
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
 ---
 
 You are onboarding the repository at `$ARGUMENTS` into the Lodestar workspace. This command is **informational and non-destructive** — it adds knowledge, it does not enforce anything. Narrate each step.
@@ -34,9 +34,16 @@ Classify the repo using these signals (collect ALL that match):
 
 Report the detected tags. Tags fall into two kinds: **stack tags** (the ecosystem — `python-django`, `react-native`) and **capability tags** (a tool is configured — `has-eslint`, `has-gitleaks`). Both feed the pickers identically; capability tags are how a rule adapts to "this repo already uses X." (Extend this table for new stacks/capabilities as needed — see `docs/EXTENDING.md`.)
 
-## 3. Generate the architecture graph (Graphify)
-- If the `graphify` CLI is available, run it against the repo and move/copy its outputs (`graph.html`, `GRAPH_REPORT.md`, `graph.json`) into `docs/REPO/architecture/`.
-- If Graphify is **not** installed, create `docs/REPO/architecture/README.md` with a note and the exact install + run commands (`uv tool install graphifyy` or `pipx install`, then `graphify install`, then `graphify <repo-path>`). Do not fail — this step is optional.
+## 3. Map the architecture (Graphify if installed, else Markdown)
+The "Structure" layer gives the assistant a map to query instead of re-reading source. Produce it one of two ways — never fail this step, and never silently skip it.
+
+- **If the `graphify` CLI is available:** run it against the repo and move/copy its outputs (`graph.html`, `GRAPH_REPORT.md`, `graph.json`) into `docs/REPO/architecture/`. This is the richest, deterministic option. Done.
+- **If Graphify is NOT installed:** do not assume. Ask the user (AskUserQuestion) how to proceed, with two options:
+  1. **Install Graphify first, then re-run** *(richest, deterministic)* — Graphify installs entirely at **user level, no sudo**. Show the commands: `uv tool install graphifyy` (or `pipx install graphifyy`), then `graphify install`. Then **pause onboarding** — tell the user to re-run `/onboard-repo $ARGUMENTS` once installed, and stop at this step (still do nothing destructive). Do NOT proceed to later steps in this run.
+  2. **Generate Markdown docs now** *(zero install, works anywhere)* — explore the repo (Glob/Grep/Read; dispatch the Explore agent if available) and write `docs/REPO/architecture/overview.md` by hand: entry points, a module/directory map, the key runtime flows, a mermaid diagram, and a "where to find X" table. This is what the `architecture-overview` skill consumes. It is **not** machine-queryable JSON like Graphify and can drift (re-generate to refresh), but it removes the install burden and needs no external tool.
+- Optionally mention the deterministic middle ground for later: `ast-grep` (`npm i -g @ast-grep/cli`, no sudo) for structural queries across ~20 languages.
+
+Record which path was taken (graphify / markdown / deferred) so a later re-run is unambiguous.
 
 ## 4. File repo docs
 - Create `docs/REPO/conventions.md` from `.lodestar/templates/docs/repo-conventions.md` if present, else a short stub with TODO markers (build/run commands, lint, test, notable patterns). Pre-fill anything you can read from `package.json` scripts.

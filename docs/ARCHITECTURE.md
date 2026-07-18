@@ -63,13 +63,13 @@ docs/
 
 > A skill body should be thin and **point at the docs** (`read docs/<repo>/…`). Skills route; docs hold content. This keeps a single source of truth.
 
-### Layer 3 — Structure (Graphify code graph)
+### Layer 3 — Structure (code graph, or a Markdown overview)
 
-[Graphify](https://github.com/Graphify-Labs/graphify) parses code with tree-sitter (deterministic, local, ~40 languages) and emits per repo: an interactive `graph.html`, a `GRAPH_REPORT.md`, and a queryable `graph.json` — explicitly "for querying without re-reading files." That directly serves the original goal: *refer to a map instead of re-reading source over and over.*
+[Graphify](https://github.com/Graphify-Labs/graphify) parses code with tree-sitter (deterministic, local, ~40 languages) and emits per repo: an interactive `graph.html`, a `GRAPH_REPORT.md`, and a queryable `graph.json` — explicitly "for querying without re-reading files." That directly serves the original goal: *refer to a map instead of re-reading source over and over.* When present, Graphify **replaces hand-writing** the `architecture/` docs; `/onboard-repo` runs it and files the outputs under `docs/<repo>/architecture/`. Because it is deterministic, re-running it is cheap — that is how Lodestar beats architecture-doc drift.
 
-Graphify **replaces hand-writing** the `architecture/` docs. The `/onboard-repo` command runs it and files the outputs under `docs/<repo>/architecture/`. Because it is deterministic, re-running it is cheap — that is how Lodestar beats architecture-doc drift.
+**Graphify is optional — the Structure layer degrades gracefully.** It is not a hard dependency, and it installs entirely at **user level (no sudo)**. If the CLI is absent, `/onboard-repo` asks the user to choose: **(a)** install Graphify (`uv tool install graphifyy` → `graphify install`) and re-run, or **(b)** generate `docs/<repo>/architecture/overview.md` in Markdown right now — entry points, module map, key flows, a mermaid diagram — with no external tool. The Markdown map is less rich and can drift (it isn't a queryable `graph.json`), but it keeps onboarding zero-friction on any machine. Either way the `architecture-overview` skill reads whatever is in `docs/<repo>/architecture/`. (A deterministic middle ground, `ast-grep`, also installs without sudo for structural queries.)
 
-**Important caveat — the cross-repo edge.** Graphify draws *static* edges (imports, calls, inheritance). Repos that talk over an API at **runtime** (e.g. a GraphQL/REST boundary) do **not** import each other's code, so Graphify will not draw that edge. Per-repo graphs are excellent; the **cross-repo spine stays hand-written** in `docs/_shared/<api>-contract.md`. This is not a bug — it is the correct division between what a parser can know and what only a human can state.
+**Important caveat — the cross-repo edge.** Graphify draws *static* edges (imports, calls, inheritance). Repos that talk over an API at **runtime** (e.g. a GraphQL/REST boundary) do **not** import each other's code, so Graphify will not draw that edge. Per-repo graphs are excellent; the **cross-repo spine stays hand-written** in `docs/_shared/api-contract.md`. This is not a bug — it is the correct division between what a parser can know and what only a human can state.
 
 ### Layer 4 — Guardrails (enforced rules)
 
