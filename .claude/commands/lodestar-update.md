@@ -16,7 +16,7 @@ You update the Lodestar **kit** installed in this workspace to the latest versio
 - Read `<SOURCE>/VERSION` — the new version. If it equals `.lodestar/VERSION`, tell the user they're already current and ask whether to re-sync anyway (to repair files); otherwise continue.
 
 ## 3. Re-sync the kit (non-destructive)
-- Run the source installer against this workspace: `"<SOURCE>/install.sh" "$PWD"`. It detects the existing install and updates in place — refreshing `.lodestar/catalog`, `.lodestar/templates`, `.claude/commands/lodestar-*.md`, and (only if already present) `.claude/hooks/lodestar-guardrails.py`, plus `.lodestar/VERSION` and `.lodestar/SOURCE`. It does not remove or overwrite any generated content.
+- Run the source installer against this workspace: `"<SOURCE>/install.sh" "$PWD"`. It detects the existing install and updates in place — refreshing `.lodestar/catalog`, `.lodestar/templates`, `.claude/commands/lodestar-*.md`, and (only if already present) the engine/hook scripts `.claude/hooks/lodestar-guardrails.py`, `.claude/hooks/lodestar-graph-refresh.sh`, and `.claude/hooks/lodestar-freshness-check.py`, plus `.lodestar/VERSION` and `.lodestar/SOURCE`. It does not remove or overwrite any generated content (manifest, `.claude/guardrails/*`, docs, `.gitattributes`, git-hook wiring).
 - Do **not** hand-copy files yourself — let `install.sh` do it so the behavior stays in one place.
 
 ## 4. Report what changed and what to do next
@@ -26,4 +26,5 @@ You update the Lodestar **kit** installed in this workspace to the latest versio
   - New or changed **guardrails** → re-run `/lodestar-guardrails` and tick them.
   - New or changed **agents** → re-run `/lodestar-agents`.
   - New **stack skills** → re-run `/lodestar-onboard ./<repo>` for the affected repo.
+  - **Freshness** available but not enabled (no `freshness` key in the manifest) → suggest `/lodestar-freshness` to keep architecture maps in sync with the code.
 - Remind the user their existing rules/agents/docs were left exactly as they were; updating the catalog never regenerates them silently — adoption is always an explicit re-run.

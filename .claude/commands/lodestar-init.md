@@ -37,7 +37,7 @@ Do NOT copy stack-scoped skills here — those are added per repo by `/lodestar-
 Create `./.claude/lodestar.manifest.json`:
 ```json
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "placement": "<personal|git-workspace>",
   "repos": [],
   "skills": ["planning-workflow", "architecture-overview"],
@@ -45,6 +45,7 @@ Create `./.claude/lodestar.manifest.json`:
   "agents": []
 }
 ```
+`repos` stays empty here — `/lodestar-onboard` appends each repo with its `stacks`, `architecture`, `docs`, and a `mapping` freshness fingerprint. Freshness automation (lockstep graph rebuild / drift detection) is added later by `/lodestar-freshness` and recorded under a `freshness` key.
 
 ## 7. Report and suggest next steps
 Summarize what was created. Then tell the user to run, for each repo:

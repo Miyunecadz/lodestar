@@ -2,6 +2,22 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.4.0] — Unreleased
+
+Graph-freshness pass — the onboarded architecture map now stays in sync with the code instead of silently drifting. Because `CLAUDE.md` tells agents to *trust* the graph over re-reading source, a stale map was a correctness risk, not just staleness. Closes the core of #2.
+
+### Added
+- **`/lodestar-freshness`** — opt-in, transport-aware installer for map freshness. Detects the repo's git-hook manager (lefthook / husky / `core.hooksPath` / plain `.git/hooks`) and wires freshness in **without clobbering** existing hooks.
+- **graphify lockstep pre-commit rebuild** (`templates/hooks/lodestar-graph-refresh.sh`) — on commit, rebuilds any graphify repo with **staged** code and stages the refreshed `graph.json`/`GRAPH_REPORT.md`/`graph.html` into the *same* commit, so code and map move together on every branch/checkout/pull. Monorepo-aware (only changed repos rebuild), offline (~1s), and **never blocks a commit** — a missing `graphify` CLI or a failure degrades to a hint (`--no-verify`/`LEFTHOOK=0` remain the escape hatch).
+- **Union merge driver** for graphs (`templates/git/gitattributes-graphify`) — `.gitattributes` marks `graph.json`/`GRAPH_REPORT.md` for `merge=graphify-union` so two branches that both rebuilt a graph merge cleanly; falls back to normal 3-way merge where the per-clone driver isn't registered.
+- **Markdown-mode drift detection** (`templates/hooks/lodestar-freshness-check.py`) — offline, stdlib-only. Diffs `mapping.lastMappedSha..HEAD` for code under each repo and reports drift (with `--exit-code` for a CI gate). No silent LLM rebuilds.
+- **`/lodestar-refresh <repo>`** — on-demand re-map for markdown repos (re-runs the mapping pass, preserving human prose) and manual graphify rebuilds; re-stamps the fingerprint.
+- **Freshness fingerprint in the manifest** — `/lodestar-onboard` now records each repo's `architecture`, `docs` path, and `mapping` (`lastMappedSha`/`lastMappedAt`); `/lodestar-freshness` records a `freshness` block (hook manager, lockstep vs drift-checked repos, merge driver).
+
+### Changed
+- **`install.sh` / `/lodestar-update`** re-sync the freshness hooks (`lodestar-graph-refresh.sh`, `lodestar-freshness-check.py`) — but only if a workspace already installed them, mirroring the guardrail-engine refresh. Generated content (manifest, `.gitattributes`, git-hook wiring) is never touched.
+- `docs/ARCHITECTURE.md` documents the freshness layer, the manifest fingerprint, and updates the roadmap; `catalog/CATALOG.md` lists the new templates.
+
 ## [0.3.0] — Unreleased
 
 Distribution & updatability pass — Lodestar is now branded, collision-safe, and updatable in place (no more delete-and-re-clone).
@@ -53,6 +69,7 @@ Initial version — not yet published.
 - Thin `CLAUDE.md` router, `_shared/` doc stubs (GraphQL + REST API contract, env matrix, auth, runbook, glossary), `repo-map.md`, per-repo conventions, per-workspace MCP configs.
 - `.claude/lodestar.manifest.json` reproducible lockfile; `install.sh`; docs (`ARCHITECTURE`, `CONCEPTS`, `EXTENDING`) and an end-to-end example.
 
+[0.4.0]: https://github.com/Miyunecadz/lodestar
 [0.3.0]: https://github.com/Miyunecadz/lodestar
 [0.2.0]: https://github.com/Miyunecadz/lodestar
 [0.1.0]: https://github.com/Miyunecadz/lodestar

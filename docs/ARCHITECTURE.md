@@ -71,6 +71,12 @@ docs/
 
 **Important caveat — the cross-repo edge.** Graphify draws *static* edges (imports, calls, inheritance). Repos that talk over an API at **runtime** (e.g. a GraphQL/REST boundary) do **not** import each other's code, so Graphify will not draw that edge. Per-repo graphs are excellent; the **cross-repo spine stays hand-written** in `docs/_shared/api-contract.md`. This is not a bug — it is the correct division between what a parser can know and what only a human can state.
 
+**Keeping the map fresh — a correctness concern, not just hygiene.** Because the router tells agents to *trust* the graph over re-reading source, a stale map doesn't merely underperform — it **actively misleads**. So the map carries a freshness fingerprint (`mapping.lastMappedSha` / `lastMappedAt`, written by `/lodestar-onboard`), and `/lodestar-freshness` installs the mechanism that maintains it, tiered by architecture:
+- **graphify** → a **lockstep pre-commit hook** rebuilds any repo with staged code and stages the refreshed `graph.json`/`GRAPH_REPORT.md`/`graph.html` into the *same* commit, so code and map move together on every branch, checkout, and pull. Deterministic, offline (~1s), and it **never blocks a commit** — a missing CLI or failure degrades to a hint. A union merge driver keeps two branches' rebuilt graphs from conflicting.
+- **markdown** → regeneration needs the LLM mapping pass, so it is **never silent**: an offline drift detector (`lastMappedSha..HEAD` for code under the repo) surfaces staleness, and `/lodestar-refresh <repo>` re-runs the mapping on demand.
+
+This is opt-in, integrates with the repo's existing git-hook manager (lefthook / husky / `core.hooksPath` / plain) without clobbering, and is re-synced by `/lodestar-update`.
+
 ### Layer 4 — Guardrails (enforced rules)
 
 The pivotal distinction in Lodestar:
@@ -115,7 +121,7 @@ write only the chosen entries → record them in the manifest
 
 - **Catalog** = the reusable, publishable asset. A folder of *templates* (guardrails, agents, skills), each tagged with metadata (`stacks`, `category`, `severity`, `recommended`, …). Forking Lodestar = editing the catalog. This is a lightweight, in-repo "marketplace." The catalog is a **universal core** (`stacks: [all]`) plus **stack packs** that activate only when detected — it ships a Node·GraphQL·React·React Native pack and a Python·Django pack. See `catalog/CATALOG.md`.
 - **Picker** = the command. Generic. It reads the catalog, detects stacks, and drives an `AskUserQuestion` multi-select (Claude Code's native selectable menu). Recommended entries are pre-checked; the menu only shows entries that apply to the detected stacks — so it feels curated, not a wall of toggles.
-- **Manifest** = `.claude/lodestar.manifest.json`. Records the workspace, detected repos/stacks, and which guardrails/agents/skills are enabled. It is your **lockfile**: commit or share it, and `re-apply` reproduces the exact setup elsewhere.
+- **Manifest** = `.claude/lodestar.manifest.json`. Records the workspace, detected repos/stacks, and which guardrails/agents/skills are enabled. It is your **lockfile**: commit or share it, and `re-apply` reproduces the exact setup elsewhere. Each repo also carries its `architecture` (`graphify`/`markdown`/`deferred`), its `docs` path, and a `mapping` freshness fingerprint (`lastMappedSha`/`lastMappedAt`); an optional top-level `freshness` key records what `/lodestar-freshness` installed (hook manager, which repos are lockstep vs drift-checked, merge driver).
 
 ### Stack detection (heuristics)
 
@@ -173,7 +179,7 @@ Lodestar itself (this repo) is always a normal git repo — it is the kit. The c
 
 **Cons / risks**
 - **Skill/agent discovery depends on `description` quality.** Vague triggers load the wrong thing or nothing. This is the real ongoing maintenance cost.
-- **Docs drift.** Graphify fights it for *structure*; hand-written `_shared/` docs still need refreshing. Generated ≠ maintained.
+- **Docs drift.** Graphify fights it for *structure*, and `/lodestar-freshness` closes the gap for the graph itself — lockstep rebuilds (graphify) or a drift signal + `/lodestar-refresh` (markdown). Hand-written `_shared/` docs still need refreshing by hand. Generated ≠ maintained, but the generated *map* is now maintained if you opt in.
 - **Complexity budget.** Five layers is a lot. Adopt them in order; add agents last, and only the ones you will actually delegate to.
 - **Portability limits.** Declarative guardrail rules (`.claude/guardrails/*.md` + the bundled engine) travel well and are self-contained; any rule needing a shell script (the lint router) is the least portable part — keep those clearly marked.
 - **Generator quality.** Auto-generated "best practices" tend to be generic. The high-value docs (architecture rationale, gotchas, why-not-X) still need a human. Treat generators as bootstrap + refresh, then curate.
@@ -204,6 +210,8 @@ Choices made during design, with the reasoning, so forks can revisit them delibe
 
 - **v0.1 (initial, unreleased)** — router + four generator commands; catalog with a universal core plus Node·GraphQL·RN and Python·Django packs; core-vs-packs signposting (`catalog/CATALOG.md`); doc & MCP templates; install script.
 - **v0.2 (unreleased)** — stack-neutral universal core; self-contained folder-based guardrail engine (no plugin dependency); adaptive `/lodestar-guardrails` + `/lodestar-agents` pickers; Markdown architecture fallback when Graphify is absent; universal security / UI / accessibility / docs agents.
-- **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; CI recipe to refresh Graphify graphs on a schedule.
+- **v0.3 (unreleased)** — branding + collision-safe `lodestar-*` commands; re-runnable installer + `/lodestar-update`; CI / release pipeline.
+- **v0.4 (unreleased)** — **graph freshness**: per-repo mapping fingerprint; graphify **lockstep** pre-commit rebuild + union merge driver; markdown-mode drift detection + `/lodestar-refresh`; transport-aware `/lodestar-freshness` installer.
+- **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; a completeness assertion for the graph (see issue #5); mirror `commit`-surface guardrails into the git-hook layer (issue #3).
 
 See [`CONCEPTS.md`](CONCEPTS.md) for the mental models and [`EXTENDING.md`](EXTENDING.md) to add your own catalog entries.

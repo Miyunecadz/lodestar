@@ -46,7 +46,13 @@ The "Structure" layer gives the assistant a map to query instead of re-reading s
   2. **Generate Markdown docs now** *(zero install, works anywhere)* — explore the repo (Glob/Grep/Read; dispatch the Explore agent if available) and write `docs/REPO/architecture/overview.md` by hand: entry points, a module/directory map, the key runtime flows, a mermaid diagram, and a "where to find X" table. This is what the `architecture-overview` skill consumes. It is **not** machine-queryable JSON like Graphify and can drift (re-generate to refresh), but it removes the install burden and needs no external tool.
 - Optionally mention the deterministic middle ground for later: `ast-grep` (`npm i -g @ast-grep/cli`, no sudo) for structural queries across ~20 languages.
 
-Record which path was taken (graphify / markdown / deferred) so a later re-run is unambiguous.
+Record which path was taken (graphify / markdown / deferred) so a later re-run is unambiguous. This becomes the repo's `architecture` in the manifest (step 6) and decides how `/lodestar-freshness` keeps the map current.
+
+**Stamp a freshness fingerprint.** A map is only trustworthy while it matches the code, and `CLAUDE.md` tells agents to *trust* it — so record when it was built. After producing the map, capture the current commit and time:
+- `lastMappedSha` = `git -C $ARGUMENTS rev-parse HEAD` (the commit the map corresponds to).
+- `lastMappedAt` = current ISO-8601 UTC timestamp.
+
+These go under the repo's `mapping` in the manifest (step 6) so drift is cheaply detectable later (`lastMappedSha..HEAD` for code under the repo). If the architecture step was **deferred** (Graphify not installed, user chose to re-run later), do not stamp a fingerprint — there is no map yet.
 
 ## 4. File repo docs — pre-fill from evidence, TODO only the unknowable
 Create `docs/REPO/conventions.md` from `.lodestar/templates/docs/repo-conventions.md` (else a short stub). Then **actively fill it in from what you just read** — do not leave a field TODO when the repo already answers it.
@@ -79,7 +85,18 @@ Keep the filename `api-contract.md` either way — the cross-links in the other 
 
 ## 6. Update the map and manifest
 - Append the repo + its detected stacks to `docs/repo-map.md`.
-- Add to `.claude/lodestar.manifest.json` under `repos`: `{ "name": "REPO", "path": "$ARGUMENTS", "stacks": [ ... ] }`. Merge any newly installed skills into `skills`.
+- Add to `.claude/lodestar.manifest.json` under `repos`:
+  ```json
+  {
+    "name": "REPO",
+    "path": "$ARGUMENTS",
+    "stacks": [ ... ],
+    "architecture": "graphify|markdown|deferred",
+    "docs": "docs/REPO/",
+    "mapping": { "lastMappedSha": "<HEAD sha>", "lastMappedAt": "<ISO-8601 UTC>" }
+  }
+  ```
+  Include `mapping` only when a map was actually produced (omit it for a **deferred** architecture). Merge any newly installed skills into `skills`.
 
 ## 7. Report
-Summarize: stacks detected, graph status, docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`) and delegation (`/lodestar-agents`) are separate opt-in commands they can now run, since the stacks are known.
+Summarize: stacks detected, graph status, docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`), delegation (`/lodestar-agents`), and **map freshness** (`/lodestar-freshness` — keeps the architecture map in sync with the code so a stale graph never misleads an agent) are separate opt-in commands they can now run, since the stacks and architecture are known.

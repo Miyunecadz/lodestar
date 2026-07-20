@@ -81,6 +81,9 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 | `templates/docs/_shared/{env-matrix,auth-model,local-setup,glossary}.md` | cross-repo docs (stack-neutral) |
 | `templates/docs/repo-conventions.md` | per-repo conventions stub |
 | `templates/hooks/lodestar-guardrails.py` | the bundled guardrail engine (`/lodestar-guardrails` copies it to `.claude/hooks/`) |
+| `templates/hooks/lodestar-graph-refresh.sh` | graphify-mode **lockstep** pre-commit graph rebuild (`/lodestar-freshness`) |
+| `templates/hooks/lodestar-freshness-check.py` | offline drift detector for architecture maps (`/lodestar-freshness`, `/lodestar-refresh`) |
+| `templates/git/gitattributes-graphify` | union-merge `.gitattributes` for `graph.json` (`/lodestar-freshness`) |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 
 The contract spine is always the file `docs/_shared/api-contract.md`. `/lodestar-init` seeds it from the **generic** stub (no API-style assumption); `/lodestar-onboard` may later enrich it from the GraphQL or REST seed **only if** that stack is actually detected and the file is still the untouched generic template. The other shared docs all link to the stable `api-contract.md` name.
