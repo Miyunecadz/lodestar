@@ -1,0 +1,16 @@
+# Lodestar graph-freshness — union merge for generated graphs.
+#
+# `/lodestar-freshness` appends these lines to the workspace `.gitattributes`
+# (committed) so two branches that both rebuilt a graph merge cleanly instead of
+# conflicting on the generated JSON/report. The named driver is registered
+# per-clone (not committed — it can't be):
+#
+#   git config merge.graphify-union.name   "graphify union merge for graph.json"
+#   git config merge.graphify-union.driver "graphify merge-driver %O %A %B"
+#
+# If the driver isn't registered in a given clone (teammate/CI without graphify),
+# git falls back to its normal 3-way merge — nothing breaks, you may just get an
+# ordinary conflict on graph.json that a rebuild resolves.
+
+docs/*/architecture/graph.json        merge=graphify-union
+docs/*/architecture/GRAPH_REPORT.md   merge=graphify-union
