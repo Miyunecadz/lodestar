@@ -6,7 +6,7 @@ Everything in Lodestar is a plain file. Adding capability means adding a catalog
 
 ## Add a guardrail
 
-1. Copy an existing rule in `catalog/guardrails/` to `catalog/guardrails/<your-id>.md`.
+1. Copy an existing rule in `kit/catalog/guardrails/` to `kit/catalog/guardrails/<your-id>.md`.
 2. Edit the frontmatter:
    - `severity: block` for safety (hard stop), `warn` for quality (informational).
    - `stacks:` — which stacks it applies to, or `[all]`.
@@ -37,7 +37,7 @@ The picker writes this to `.claude/guardrails/warn-direct-main-edits.md`; the bu
 
 ## Add an agent role
 
-1. Copy a role from `catalog/agents/` to `catalog/agents/<your-id>.md`.
+1. Copy a role from `kit/catalog/agents/` to `kit/catalog/agents/<your-id>.md`.
 2. Set the **tool profile** (`tools:`) to the minimum the role needs — this is the most important field. A read-only role gets no `Edit`/`Write`.
 3. Keep the body **thin**: state the role, its repo scope, and which skills/docs to `load`. Do not restate conventions — reference the skill that owns them.
 4. Write a crisp `description` (the delegation trigger). Make it non-overlapping with other roles.
@@ -47,7 +47,7 @@ Guardrail for yourself: if a new role's body starts duplicating a skill, stop �
 
 ## Add a skill
 
-1. Create `catalog/skills/<name>/SKILL.md`.
+1. Create `kit/catalog/skills/<name>/SKILL.md`.
 2. The `description` is a *when-to-load* trigger — write it as a **task**, not a topic (see [CONCEPTS.md §1](CONCEPTS.md)).
 3. Keep the body thin; point at `docs/…`.
 4. It's picked up on the next `/lodestar-onboard` (for stack-scoped skills) or copied by `/lodestar-init` (for workspace-wide skills like planning).
@@ -65,14 +65,14 @@ A "stack pack" is just a *set* of catalog entries that share stack tags for one 
 
 1. Add its detectors to `/lodestar-onboard` (see above).
 2. Author its guardrails, agents, and skills, tagging each with the pack's stacks. Mirror an existing pack's shape (a migration guardrail, a migration-writer agent, a backend-standards skill, an api-contract skill, a test-writer, an autolint rule).
-3. If it has its own API style, add a `templates/docs/_shared/<style>-api-contract.md` stub.
-4. List the new entries in [`../catalog/CATALOG.md`](../catalog/CATALOG.md) under a new pack heading.
+3. If it has its own API style, add a `kit/templates/docs/_shared/<style>-api-contract.md` stub.
+4. List the new entries in [`../kit/catalog/CATALOG.md`](../kit/catalog/CATALOG.md) under a new pack heading.
 
 Packs compose: a workspace can activate several at once (e.g. a Django API behind a React admin panel).
 
 ## Add an MCP template
 
-Drop a `<name>.mcp.json` in `templates/mcp/` with a server list (no secrets). Document in the file's companion note which servers it includes and how to authenticate (`/mcp`). Users copy it to their workspace root as `.mcp.json` and supply their own tokens via local scope.
+Drop a `<name>.mcp.json` in `kit/templates/mcp/` with a server list (no secrets). Document in the file's companion note which servers it includes and how to authenticate (`/mcp`). Users copy it to their workspace root as `.mcp.json` and supply their own tokens via local scope.
 
 ---
 

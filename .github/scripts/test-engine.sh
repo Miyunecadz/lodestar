@@ -2,7 +2,7 @@
 # Smoke-test the guardrail engine end to end against a temp rule set.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENGINE="$ROOT/templates/hooks/lodestar-guardrails.py"
+ENGINE="$ROOT/kit/templates/hooks/lodestar-guardrails.py"
 
 python3 -c "import py_compile,sys; py_compile.compile('$ENGINE', doraise=True)" && echo "engine compiles"
 

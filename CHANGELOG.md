@@ -2,6 +2,14 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.5.0] — Unreleased
+
+Repo layout pass — separate what Lodestar *ships* from how this repo is *built*. Purely structural: the installed workspace is byte-identical to 0.4.0.
+
+### Changed
+- **Kit source now lives under `kit/`.** `catalog/`, `templates/`, and the `lodestar-*` command specs (previously in `.claude/commands/`) moved to `kit/catalog/`, `kit/templates/`, `kit/commands/`. `install.sh`, the CI validator, the engine smoke test, and doc/README links were repointed. The target-workspace layout it produces (`.lodestar/…`, `.claude/commands/…`) is unchanged.
+- **Root `.claude/` is now this repo's own dev tooling**, not a product surface — free for contributor agents/skills/workflows/settings. See `CONTRIBUTING.md`. `install.sh` only ever copies from `kit/`, so nothing in `.claude/` can leak into the product. (Side effect: the `lodestar-*` commands are no longer live while developing this repo — install into a scratch workspace to exercise them.)
+
 ## [0.4.0] — Unreleased
 
 Graph-freshness pass — the onboarded architecture map now stays in sync with the code instead of silently drifting. Because `CLAUDE.md` tells agents to *trust* the graph over re-reading source, a stale map was a correctness risk, not just staleness. Closes the core of #2.
@@ -69,6 +77,7 @@ Initial version — not yet published.
 - Thin `CLAUDE.md` router, `_shared/` doc stubs (GraphQL + REST API contract, env matrix, auth, runbook, glossary), `repo-map.md`, per-repo conventions, per-workspace MCP configs.
 - `.claude/lodestar.manifest.json` reproducible lockfile; `install.sh`; docs (`ARCHITECTURE`, `CONCEPTS`, `EXTENDING`) and an end-to-end example.
 
+[0.5.0]: https://github.com/Miyunecadz/lodestar
 [0.4.0]: https://github.com/Miyunecadz/lodestar
 [0.3.0]: https://github.com/Miyunecadz/lodestar
 [0.2.0]: https://github.com/Miyunecadz/lodestar

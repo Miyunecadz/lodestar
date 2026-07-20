@@ -96,15 +96,15 @@ claude
 
 - Not a monorepo tool — your repos stay independent, with their own git history and CI.
 - Not a replacement for Claude Code features — it's a disciplined way to *arrange* them (skills, hooks, agents, MCP scopes).
-- Not opinionated about your stack — the catalog is a **universal core** (works anywhere) plus **stack packs** that activate only when detected. It ships a **Node·GraphQL·React·React Native** pack and a **Python·Django** pack; every entry is stack-tagged and easy to swap or extend. See [`catalog/CATALOG.md`](catalog/CATALOG.md).
+- Not opinionated about your stack — the catalog is a **universal core** (works anywhere) plus **stack packs** that activate only when detected. It ships a **Node·GraphQL·React·React Native** pack and a **Python·Django** pack; every entry is stack-tagged and easy to swap or extend. See [`kit/catalog/CATALOG.md`](kit/catalog/CATALOG.md).
 
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the full design and the rationale behind every decision.
 - [`docs/CONCEPTS.md`](docs/CONCEPTS.md) — the mental models (advisory vs enforced, map/hands, the loading policy).
 - [`docs/EXTENDING.md`](docs/EXTENDING.md) — how to add your own guardrails, agents, and skills to the catalog.
-- [`catalog/README.md`](catalog/README.md) — the catalog entry format.
-- [`catalog/CATALOG.md`](catalog/CATALOG.md) — the grouped index: universal core + stack packs.
+- [`kit/catalog/README.md`](kit/catalog/README.md) — the catalog entry format.
+- [`kit/catalog/CATALOG.md`](kit/catalog/CATALOG.md) — the grouped index: universal core + stack packs.
 - [`examples/walkthrough.md`](examples/walkthrough.md) — a concrete end-to-end example.
 - [`docs/CI.md`](docs/CI.md) — CI checks, trunk-based release automation, and the branch-protection ruleset.
 

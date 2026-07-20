@@ -110,4 +110,4 @@ description: Use when scoping or spec'ing a feature, BEFORE any code is written.
 
 ## Adding your own entries
 
-See [`../docs/EXTENDING.md`](../docs/EXTENDING.md) for a step-by-step guide. In short: copy an existing entry, change the frontmatter, write the body, and re-run the relevant picker. No code changes required.
+See [`../../docs/EXTENDING.md`](../../docs/EXTENDING.md) for a step-by-step guide. In short: copy an existing entry, change the frontmatter, write the body, and re-run the relevant picker. No code changes required.
