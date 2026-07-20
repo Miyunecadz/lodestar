@@ -37,7 +37,7 @@ def frontmatter(path):
 
 
 def check_guardrails():
-    for path in sorted(glob.glob(os.path.join(ROOT, "catalog/guardrails/*.md"))):
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
         rel = os.path.relpath(path, ROOT)
         fm = frontmatter(path)
         for key in ("id", "severity", "stacks", "event", "pattern", "emits"):
@@ -58,7 +58,7 @@ def check_guardrails():
 
 
 def check_agents():
-    for path in sorted(glob.glob(os.path.join(ROOT, "catalog/agents/*.md"))):
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/agents/*.md"))):
         rel = os.path.relpath(path, ROOT)
         fm = frontmatter(path)
         if "id" not in fm and "name" not in fm:
@@ -69,7 +69,7 @@ def check_agents():
 
 
 def check_skills():
-    for path in sorted(glob.glob(os.path.join(ROOT, "catalog/skills/*/SKILL.md"))):
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/skills/*/SKILL.md"))):
         rel = os.path.relpath(path, ROOT)
         fm = frontmatter(path)
         for key in ("name", "description"):

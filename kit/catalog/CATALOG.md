@@ -2,7 +2,7 @@
 
 Lodestar's catalog is organized into a **universal core** that works on any stack, plus **stack packs** whose entries activate only when a matching stack is detected. The `stacks:` field on each entry is what the pickers filter on — an entry never appears (or fires) on a workspace whose stacks don't match.
 
-> Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../docs/EXTENDING.md`](../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
+> Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../../docs/EXTENDING.md`](../../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
 
 Totals: **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Django.
 
