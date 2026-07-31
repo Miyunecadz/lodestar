@@ -55,6 +55,34 @@ Two properties to preserve when adding a flag:
 - **Fail protective.** Every probe is best-effort. No git, no manifest, an unparseable command, a detached HEAD — the rule must fall back to behaving as a plain pattern match (or stay silent, for a rule that *adds* blocking). It must never quietly drop an existing safety rule.
 - **Never raise.** The engine allows the action on any internal error. A guardrail that crashes the hook would block every tool call in the workspace.
 
+### Enforcement surface — who the rule holds for
+
+The PreToolUse engine only fires when *Claude* is about to act. A teammate in their IDE, or CI, never touches that path, so a rule is only as universal as its **surface**:
+
+| `surface` | Enforced by | Holds for |
+|---|---|---|
+| `agent` | `.claude/hooks/lodestar-guardrails.py` (PreToolUse) | Claude tool-use only |
+| `commit` | `.claude/hooks/lodestar-precommit-check.py` (pre-commit) | any committer |
+| `both` | both hooks | everyone |
+
+A `commit`/`both` rule needs something the pre-commit checker can run — `commit_check`, or an `event: file` pattern (which defaults to `staged-paths`):
+
+| `commit_check` | What it inspects |
+|---|---|
+| `staged-paths` | the rule `pattern` against staged paths. `allow_if_untracked` maps onto git status: `A` (new in this commit) is allowed, `M` (already committed) is not |
+| `secret-scan` | the staged diff, via `gitleaks` when installed, else conservative built-in patterns |
+| `default-branch` | whether HEAD is the repo's default branch |
+
+`commit_severity` overrides `severity` on the commit surface only — use it where a rule should merely remind Claude but hard-stop a commit.
+
+**Choosing a surface is a judgement about false positives, not about how much you care.** Three rules that look like obvious commit-surface candidates are deliberately `agent`-only:
+
+- **`protect-generated-files`** matches `graph.json`, which the freshness hook *intentionally* rebuilds and stages into the same commit. Enforcing at commit time would break the lockstep map.
+- **`no-hand-edit-lockfiles`** and **`protect-dbmate-schema`** guard files that legitimate tooling commits constantly; a pre-commit hook cannot tell a `yarn add` rewrite from a hand-edit.
+- **`commit-message-style`** needs the `commit-msg` event, which reads the message file rather than the staged diff.
+
+The commit surface must **never break an unrelated commit**: the checker exits 1 only on a `block` match, and a missing tool, unreadable manifest, invalid regex, or internal error all exit 0. `git commit --no-verify` stays the documented bypass — which is also why a commit hook is not a substitute for server-side branch protection against a determined committer.
+
 Frontmatter parsing is deliberately minimal: scalars and inline lists (`[a, b]`) only. A regex containing a comma cannot go in a list value — use a single scalar pattern instead.
 
 `file` rules see the edited path; add `match: content` to test the edited text instead. Note the engine is registered for `Bash|Edit|Write|MultiEdit`, so a rule cannot intercept a `Read` — a rule body promising "never read this" is documenting intent for the model, not enforcing it.
@@ -79,9 +107,15 @@ Guardrail for yourself: if a new role's body starts duplicating a skill, stop �
 ## Add a stack detector
 
 To support a new stack:
-1. Add a detection signal to `/lodestar-onboard` (e.g. "`Cargo.toml` present → `rust`").
+1. Add a detection signal to `/lodestar-onboard` §2 (e.g. "`Cargo.toml` present → `rust`").
 2. Tag relevant catalog entries with the new stack.
 3. That's it — the pickers intersect detected stacks with entry `stacks` automatically.
+
+A tag with no entries behind it is worse than no tag: the repo matches nothing and gets the universal core silently. So onboarding treats "detected a stack, matched no pack" as a reportable gap — it writes the unmatched tags into the manifest as `catalogGaps`, generates a workspace `docs/EXTENDING.md` from `kit/templates/docs/extending-gap.md`, and says so in its summary. If you add a detector, add at least a conventions skill with it.
+
+### What a pack looks like
+
+The Laravel pack is a good shape to copy — three guardrails (migrations that already ran, framework-generated paths, the formatter), three narrow agents (endpoint / migration / test writer), one conventions skill. Keep every piece **thin**: the skill points at `docs/REPO/`, and the agents point at the skill. A pack that restates framework documentation goes stale and burns context; a pack that names the repo's own conventions doc does not.
 
 ## Add a stack pack
 

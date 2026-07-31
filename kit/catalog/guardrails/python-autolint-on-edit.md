@@ -7,6 +7,7 @@ recommended: false
 stacks: [has-python-lint]
 event: file
 pattern: '\.py$'
+surface: agent
 emits: settings-hook
 ---
 

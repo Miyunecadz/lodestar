@@ -2,6 +2,82 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.10.0] — Unreleased
+
+Catalog-coverage pass — onboarding a Laravel/PHP + Next.js monorepo produced **zero** stack-specific entries for either repo, two of the most common web stacks, and the gap was recorded only as a string in the manifest. Closes #4.
+
+### Added
+- **Laravel · PHP pack** (7 entries) — `laravel-endpoint-writer` (route + controller + FormRequest + API Resource + policy, contract updated), `eloquent-migration-writer` (new migration with a real `down()`, model updated to match), `test-writer-php` (Pest or PHPUnit, matching the repo's existing style rather than introducing a second one), `laravel-backend-standards` skill, plus guardrails: `block-edit-applied-migrations-laravel` (blocks migrations git already tracks, leaves a freshly scaffolded one writable, enforced on the **commit** surface too), `protect-laravel-generated` (`bootstrap/cache/`, `storage/framework/`, Vite/Mix output), and `php-autolint-on-edit` (Pint, scoped to `has-pint`).
+- **Next.js pack** (3 entries) — `nextjs-route-writer` (deliberate server/client boundary), `nextjs-frontend-standards` skill, and `nextjs-no-public-secrets`, a content-matching guardrail that warns when a `NEXT_PUBLIC_` variable looks like a secret. Every `NEXT_PUBLIC_` value is inlined into the client bundle, so prefixing a secret publishes it; it **warns** rather than blocks because the name alone cannot distinguish a Stripe publishable key from a secret one.
+- **Stack detectors** — `laravel` (`artisan` / `laravel/framework`), `php` (`composer.json`), `nextjs` (`next` dep or `next.config.*`), `has-pint`, `has-pest`. Onboarding also records **which router** a Next.js repo uses (`app/` vs `pages/`): the file conventions and data-fetching APIs differ, and an agent that guesses writes code that silently never runs.
+- **A detected gap now produces a document, not a manifest string.** New `kit/templates/docs/extending-gap.md` → generated as the workspace's `docs/EXTENDING.md` when a repo's stacks match no catalog entry, naming the unmatched tags, what the repo got instead (universal core only), and how to add a pack — upstream (preferred) or locally, with the trade-off that `/lodestar-update` refreshes `.lodestar/catalog/`. Appends per repo rather than overwriting. Onboarding also states the gap in its summary and records `catalogGaps.unmatchedStacks` + the doc path in the manifest.
+- **Two validator checks** — CI now fails when `CATALOG.md`'s `Totals: **N entries**` line disagrees with the files on disk, or when any guardrail/agent/skill is missing from the listing. Both were verified to fail on deliberate drift; a pack nobody can find in the index is a pack nobody adopts.
+
+### Fixed
+- **`block-env-files` blocked per-tier templates.** Its lookahead only excused a bare `.env.example`, so `.env.local.example` / `.env.staging.sample` — committed templates that exist precisely so nobody needs the real file — were treated as live secrets. The lookahead now checks the end of the name. Found while probing the new Next.js rule, whose test case was being masked by this. Real `.env.local` / `.env.production` are still blocked; the engine suite now uses the catalog's actual pattern instead of a simplified copy, so this cannot regress unnoticed.
+- **`autolint-on-edit` only matched `src/`.** Next.js App Router routes live in `app/`, Pages Router in `pages/`, and plenty of repos keep `components/`, `lib/`, or `hooks/` at the top level — all silently skipped. The pattern now covers those roots.
+
+### Notes on scope
+- **The issue's second half was already stale.** It says "the promised `docs/EXTENDING.md` was never generated", but the kit has shipped `docs/EXTENDING.md` as a contributor guide since before this work. The real gap was that a *workspace* had nothing — so the fix generates a workspace-local `docs/EXTENDING.md` about that workspace's unmatched stacks, and points at the kit guide for the mechanics. Two files, two audiences; the kit's guide is stack-agnostic and ships to everyone, so writing detected gaps into it would have been wrong.
+- **Packs are deliberately thin.** Three guardrails, three narrow agents, one conventions skill for Laravel; the skill points at `docs/REPO/` and the agents point at the skill. Restating framework documentation in a catalog entry goes stale and burns context on every load — the pack's job is to encode *where things go in this repo* and *what must not happen*, not to teach the framework.
+- **Not scaffolding stub packs** (item 3 of the issue, marked optional). A generated stub agent is an unversioned file in `.claude/` that looks official, and `/lodestar-update` will not maintain it. The generated `EXTENDING.md` steers to authoring a catalog entry instead, which is the shareable path. Happy to add scaffolding if you'd rather have it.
+
+### Upgrading
+
+Re-run `/lodestar-onboard ./<repo>` on a Laravel or Next.js repo to pick up the new detectors and skills, then `/lodestar-guardrails` and `/lodestar-agents` to tick the new entries. Existing repos are unaffected until you do.
+
+## [0.9.0] — Unreleased
+
+Graph-completeness pass — a map can be *born* incomplete, and nothing checked. Node counts were never compared against the source tree, so a graph missing whole files looked identical to a complete one. Because `CLAUDE.md` tells agents to prefer querying the graph over re-reading source, that misleads an agent exactly like a stale map does. Closes #5.
+
+### Added
+- **Coverage checker** (`kit/templates/hooks/lodestar-graph-coverage.py`) — compares the code files on disk against the `source_file`s present in `graph.json` and splits the difference four ways: **covered**, **missing** (code graphify would scan but has no nodes → a real gap), **skipped** (excluded on purpose — noise dirs, `.graphifyignore`/`.gitignore`, generated lockfiles), **stale** (graph references a file no longer on disk). Only `missing` is a defect, and the split is what makes the number usable: without it every `node_modules/` file reads as a gap. Manifest mode iterates the onboarded graphify repos; `--graph`/`--root` checks one tree; `--json` feeds the manifest; `--exit-code` gates CI.
+- **Authoritative classification when possible.** "Which files should be covered" is graphify's own question, so the checker imports graphify's real classifier and ignore rules (`classify_file`, `_is_noise_dir`, `_is_ignored`, `.graphifyignore` handling). graphify is normally installed as an isolated tool (uv/pipx), so it also locates the CLI's venv and adds its `site-packages` before giving up. When it genuinely can't import — or a future graphify renames an internal it depends on — it falls back to a bundled copy of the extension list and labels every result **approximate** rather than presenting a guess as exact. The mode is always reported.
+- **`mapping.coverage` + `mapping.build` in the manifest** — `filesTotal` / `filesCovered` / `filesMissing` / `filesSkipped` / `filesStale` / `mode`, so incompleteness is as visible as drift and a later rebuild can be compared against the last one. `/lodestar-refresh` flags a refresh that *lowers* coverage as a regression rather than reporting success.
+- **Coverage test suite** (`.github/scripts/test-coverage.sh`, 27 checks, wired into CI as a sixth gate) — synthetic repo plus hand-written complete / partial / stale graphs, so it needs no graphify install and exercises the fallback classifier. Asserts the missing/skipped/stale split, that `--exit-code` fails only on missing files, manifest iteration with a non-graphify repo skipped, and four degradation paths.
+
+### Changed
+- **Onboarding does a full build, not an incremental one.** `/lodestar-onboard` now runs `graphify extract <repo> --force` (adding `--code-only` when no LLM backend is configured), which skips the incremental manifest gate and semantic cache so the baseline inherits no state from an earlier partial run. `graphify update` stays the right tool for the per-commit lockstep hook, where each commit is a small delta and speed matters — the distinction is now stated in both commands.
+- **`/lodestar-refresh` also rebuilds fully** (`extract --force` rather than `update --force`): the command exists because the map is already known to be wrong, so inheriting incremental state is the wrong trade. It re-checks coverage afterwards, since a refresh is exactly when an undercount surfaces.
+- **`/lodestar-onboard` reports coverage to the user** and never blocks on it — if files are still missing after a full rebuild, it says which ones, and that queries about them will come back empty so that code must be read from source.
+- **`/lodestar-freshness`** suggests running the coverage check in CI (`--exit-code`) rather than per-commit, where it would add latency for little gain.
+- **`install.sh`** refreshes `lodestar-graph-coverage.py` on update, if already installed.
+
+### Notes on scope
+- **The issue's specific evidence did not reproduce, and the fix does not depend on it.** The report was that rebuilding unchanged code found *more* nodes than the committed graph (259 vs 253). On a synthetic repo I saw the opposite asymmetry — the incremental path retained 2 nodes a full rebuild did not produce, while **both** covered 100% of files. Node counts differing between the two paths is expected, since incremental merges into existing state. That is why the assertion here is at **file-coverage** level, which is the invariant that actually matters for "can an agent see this file", rather than a node-count comparison that would be noisy by design.
+- **Exposing a completeness command from graphify itself** (item 3 of the issue) is out of scope for this repo — graphify is a separate project. This implements the Lodestar-side check against the graph it already produces.
+- One real bug surfaced while testing: graphify applies its generated-file skip list (`package-lock.json`, `go.sum`, …) in its **walker**, not in `classify_file`, which reports those files as code. The first version of the checker therefore reported every lockfile as a *missing* file — the exact false-gap failure that makes a coverage number worthless. The skip list is now applied in both modes.
+
+### Upgrading
+
+Nothing to do — existing graphs are untouched. Coverage is recorded the next time a repo is onboarded or refreshed. To check an already-onboarded workspace now: `python3 .lodestar/templates/hooks/lodestar-graph-coverage.py`.
+
+## [0.8.0] — Unreleased
+
+Enforcement-surface pass — the safety guardrails were `PreToolUse` hooks, so they held against Claude and nobody else. A teammate in their IDE, or CI, could commit exactly what every "safety" rule exists to prevent. Rules now declare which surface they hold on, and commit-surface rules are enforced by a generated pre-commit hook for every committer. Closes #3.
+
+### Added
+- **`surface:` on every catalog guardrail** — `agent` (Claude tool-use only), `commit` (any committer), or `both`. Validated by CI, and stated in each rule body with the reason for that choice.
+- **Commit-surface checker** (`kit/templates/hooks/lodestar-precommit-check.py`) — stdlib-only, runs as a pre-commit hook, reads the **same** `.claude/guardrails/*.md` rule files so the two surfaces cannot drift. Three checks: `staged-paths` (rule pattern vs staged paths, where `allow_if_untracked` maps onto git status — `A` is a new file, `M` an already-committed one), `secret-scan` (staged diff via `gitleaks`, else conservative built-ins), and `default-branch` (refuse a direct trunk commit). Exits 1 only on a `block` match; a warn, no rules, a missing tool, an invalid regex, or any internal error exits 0.
+- **Six rules now hold for every committer** (`surface: both`) — `block-env-files`, `block-secret-files`, `block-edit-applied-migrations` (+ Django variant), `block-commit-to-default-branch`, and `scan-secrets-before-commit`.
+- **`commit_check` / `commit_severity` rule fields** — pick the commit-side check, and override severity on the commit surface only (a rule can remind Claude but hard-stop a commit).
+- **`/lodestar-guardrails` §6 installs the commit surface** (opt-in). Detects the git-hook manager — lefthook / husky / `core.hooksPath` / plain `.git/hooks` — and integrates **without clobbering**, coexisting with the freshness hook from #2 (each adds its own distinct pre-commit entry). Declining is fine, but the command then states plainly which rules therefore hold for Claude only. Records `guardrailSurfaces.commit` in the manifest.
+- **Commit-surface test suite** (`.github/scripts/test-precommit.sh`, 23 checks, wired into CI as a fourth gate) — real git repo with staged changes: `.env` blocked but `.env.example` allowed, private keys blocked, agent-only rules ignored at commit time, new migration allowed while a modified one is blocked, secret scanning, stack scoping, `--list`, trunk vs feature branch, and four degradation paths that must never break a commit.
+
+### Changed
+- **`install.sh` refreshes `lodestar-precommit-check.py`** on update, if already installed — same opt-in-preserving rule as the other hooks.
+- **Docs state the surface split explicitly** — `docs/EXTENDING.md` documents the fields and why three obvious-looking candidates stay `agent`-only; `docs/ARCHITECTURE.md` covers surfaces as a design concept; `kit/catalog/CATALOG.md` lists the commit-surface entries; the README's "advisory vs enforced" principle now names *enforced for whom* as a second, separate choice.
+
+### Notes on scope
+- **`protect-generated-files` stays `agent`-only on purpose.** Its pattern matches `graph.json`, which the freshness hook from #2 deliberately rebuilds and stages into the same commit — a commit-time block would break the lockstep map. This is the interaction that issue #2 flagged as an open edge case.
+- **`no-hand-edit-lockfiles` and `protect-dbmate-schema` likewise.** Legitimate tooling commits those files constantly, and a pre-commit hook cannot distinguish a package-manager rewrite from a hand-edit.
+- **`commit-message-style` needs a `commit-msg` hook** and `protect-default-branch` (force-push) needs `pre-push` — different git events from the `pre-commit` surface installed here. Both are noted in their bodies and on the roadmap.
+- **`scan-secrets-before-commit` blocks only with `gitleaks` installed.** Without it the built-in patterns warn instead: heuristics precise enough to nag are not precise enough to stop a teammate's commit.
+- A pre-commit hook is bypassable with `--no-verify`; server-side branch protection remains the only enforcement a determined committer cannot skip, and the docs say so.
+
+### Upgrading
+
+Existing installs keep working unchanged — the commit surface is opt-in. Re-run `/lodestar-guardrails` to adopt the `surface` metadata and install the pre-commit hook; until then every rule behaves exactly as before (Claude-only).
 ## [0.7.0] — Unreleased
 
 Distribution pass — installing Lodestar no longer leaves you holding a clone you never asked for, and updates move between released tags instead of pulling whatever is on `main`. Closes #9.

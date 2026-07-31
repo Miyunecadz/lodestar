@@ -142,11 +142,11 @@ if [ -f "$TARGET/.claude/hooks/lodestar-guardrails.py" ]; then
   cp "$KIT_DIR/kit/templates/hooks/lodestar-guardrails.py" "$TARGET/.claude/hooks/lodestar-guardrails.py"
   echo "  refreshed the guardrail engine (.claude/hooks/lodestar-guardrails.py)"
 fi
-for hook in lodestar-graph-refresh.sh lodestar-freshness-check.py; do
+for hook in lodestar-graph-refresh.sh lodestar-freshness-check.py lodestar-precommit-check.py lodestar-graph-coverage.py; do
   if [ -f "$TARGET/.claude/hooks/$hook" ]; then
     cp "$KIT_DIR/kit/templates/hooks/$hook" "$TARGET/.claude/hooks/$hook"
     case "$hook" in *.sh) chmod +x "$TARGET/.claude/hooks/$hook" ;; esac
-    echo "  refreshed the freshness hook (.claude/hooks/$hook)"
+    echo "  refreshed hook (.claude/hooks/$hook)"
   fi
 done
 
