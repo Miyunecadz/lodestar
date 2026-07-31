@@ -40,7 +40,7 @@ def check_guardrails():
     for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
         rel = os.path.relpath(path, ROOT)
         fm = frontmatter(path)
-        for key in ("id", "severity", "stacks", "event", "pattern", "emits"):
+        for key in ("id", "severity", "stacks", "event", "pattern", "emits", "surface"):
             if key not in fm:
                 errors.append(f"{rel}: missing frontmatter key '{key}'")
         if fm.get("severity") not in ("block", "warn"):
@@ -49,6 +49,18 @@ def check_guardrails():
             errors.append(f"{rel}: event must be file|bash|all (got {fm.get('event')!r})")
         if fm.get("emits") not in ("rule", "settings-hook"):
             errors.append(f"{rel}: emits must be rule|settings-hook (got {fm.get('emits')!r})")
+        if fm.get("surface") not in ("agent", "commit", "both"):
+            errors.append(f"{rel}: surface must be agent|commit|both (got {fm.get('surface')!r})")
+        # A commit-surface rule needs something the pre-commit checker can actually run:
+        # a `file` pattern (checked against staged paths) or a named built-in check.
+        if fm.get("surface") in ("commit", "both"):
+            check = fm.get("commit_check") or ("staged-paths" if fm.get("event") == "file" else None)
+            if check not in ("staged-paths", "secret-scan", "default-branch"):
+                errors.append(
+                    f"{rel}: surface {fm['surface']} needs commit_check "
+                    f"(staged-paths|secret-scan|default-branch) or event: file (got {check!r})")
+            if fm.get("commit_severity") not in (None, "block", "warn"):
+                errors.append(f"{rel}: commit_severity must be block|warn (got {fm.get('commit_severity')!r})")
         pat = fm.get("pattern")
         if pat:
             try:

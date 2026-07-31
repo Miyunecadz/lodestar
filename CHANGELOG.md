@@ -2,6 +2,32 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.8.0] — Unreleased
+
+Enforcement-surface pass — the safety guardrails were `PreToolUse` hooks, so they held against Claude and nobody else. A teammate in their IDE, or CI, could commit exactly what every "safety" rule exists to prevent. Rules now declare which surface they hold on, and commit-surface rules are enforced by a generated pre-commit hook for every committer. Closes #3.
+
+### Added
+- **`surface:` on every catalog guardrail** — `agent` (Claude tool-use only), `commit` (any committer), or `both`. Validated by CI, and stated in each rule body with the reason for that choice.
+- **Commit-surface checker** (`kit/templates/hooks/lodestar-precommit-check.py`) — stdlib-only, runs as a pre-commit hook, reads the **same** `.claude/guardrails/*.md` rule files so the two surfaces cannot drift. Three checks: `staged-paths` (rule pattern vs staged paths, where `allow_if_untracked` maps onto git status — `A` is a new file, `M` an already-committed one), `secret-scan` (staged diff via `gitleaks`, else conservative built-ins), and `default-branch` (refuse a direct trunk commit). Exits 1 only on a `block` match; a warn, no rules, a missing tool, an invalid regex, or any internal error exits 0.
+- **Six rules now hold for every committer** (`surface: both`) — `block-env-files`, `block-secret-files`, `block-edit-applied-migrations` (+ Django variant), `block-commit-to-default-branch`, and `scan-secrets-before-commit`.
+- **`commit_check` / `commit_severity` rule fields** — pick the commit-side check, and override severity on the commit surface only (a rule can remind Claude but hard-stop a commit).
+- **`/lodestar-guardrails` §6 installs the commit surface** (opt-in). Detects the git-hook manager — lefthook / husky / `core.hooksPath` / plain `.git/hooks` — and integrates **without clobbering**, coexisting with the freshness hook from #2 (each adds its own distinct pre-commit entry). Declining is fine, but the command then states plainly which rules therefore hold for Claude only. Records `guardrailSurfaces.commit` in the manifest.
+- **Commit-surface test suite** (`.github/scripts/test-precommit.sh`, 23 checks, wired into CI as a fourth gate) — real git repo with staged changes: `.env` blocked but `.env.example` allowed, private keys blocked, agent-only rules ignored at commit time, new migration allowed while a modified one is blocked, secret scanning, stack scoping, `--list`, trunk vs feature branch, and four degradation paths that must never break a commit.
+
+### Changed
+- **`install.sh` refreshes `lodestar-precommit-check.py`** on update, if already installed — same opt-in-preserving rule as the other hooks.
+- **Docs state the surface split explicitly** — `docs/EXTENDING.md` documents the fields and why three obvious-looking candidates stay `agent`-only; `docs/ARCHITECTURE.md` covers surfaces as a design concept; `kit/catalog/CATALOG.md` lists the commit-surface entries; the README's "advisory vs enforced" principle now names *enforced for whom* as a second, separate choice.
+
+### Notes on scope
+- **`protect-generated-files` stays `agent`-only on purpose.** Its pattern matches `graph.json`, which the freshness hook from #2 deliberately rebuilds and stages into the same commit — a commit-time block would break the lockstep map. This is the interaction that issue #2 flagged as an open edge case.
+- **`no-hand-edit-lockfiles` and `protect-dbmate-schema` likewise.** Legitimate tooling commits those files constantly, and a pre-commit hook cannot distinguish a package-manager rewrite from a hand-edit.
+- **`commit-message-style` needs a `commit-msg` hook** and `protect-default-branch` (force-push) needs `pre-push` — different git events from the `pre-commit` surface installed here. Both are noted in their bodies and on the roadmap.
+- **`scan-secrets-before-commit` blocks only with `gitleaks` installed.** Without it the built-in patterns warn instead: heuristics precise enough to nag are not precise enough to stop a teammate's commit.
+- A pre-commit hook is bypassable with `--no-verify`; server-side branch protection remains the only enforcement a determined committer cannot skip, and the docs say so.
+
+### Upgrading
+
+Existing installs keep working unchanged — the commit surface is opt-in. Re-run `/lodestar-guardrails` to adopt the `surface` metadata and install the pre-commit hook; until then every rule behaves exactly as before (Claude-only).
 ## [0.7.0] — Unreleased
 
 Distribution pass — installing Lodestar no longer leaves you holding a clone you never asked for, and updates move between released tags instead of pulling whatever is on `main`. Closes #9.

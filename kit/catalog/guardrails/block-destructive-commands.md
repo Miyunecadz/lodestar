@@ -7,6 +7,7 @@ recommended: true
 stacks: [all]
 event: bash
 pattern: '(\brm\s+-[a-zA-Z]*[rf]|\bgit\s+reset\s+--hard|\bgit\s+clean\s+-[a-zA-Z]*f|\bgit\s+(checkout|restore)\s+(--\s+)?\.|\bdd\s+if=|\bmkfs\b|\bshred\b|\btruncate\s+-s|\bDROP\s+(DATABASE|TABLE|SCHEMA)|>\s*/dev/(sd|nvme|disk))'
+surface: agent
 emits: rule
 match: argv
 allow_paths: ['^/tmp/', '^/var/tmp/', '^/var/folders/']
@@ -22,3 +23,5 @@ This command is irreversible and destroys work with no undo (`rm -rf`, `git rese
 This guards against mistakes, not a determined adversary — an obfuscated command can slip the pattern. It is a stop-and-redirect, not a sandbox.
 
 **Matching is shell-aware.** `match: argv` tests the command's *unquoted* words, so a destructive-looking string that runs nothing — `rm -rf` inside a JSON argument, an `echo`'d warning, a commit message — no longer trips the rule. Quoted payloads passed to a nested shell (`bash -c "…"`, `eval "…"`) are still matched, so quoting is not a bypass. `allow_paths` exempts deletes whose every operand resolves under a temp prefix (`/tmp`, `/var/tmp`, `/var/folders`), which is where scratch work lives; mix in one non-temp path and the rule fires again. Compound commands (`&&`, `;`, `|`, `$(…)`) skip the exemption entirely and always block.
+
+**Surface: `agent` only.** It guards shell commands, not commit contents; there is nothing for a pre-commit hook to inspect.

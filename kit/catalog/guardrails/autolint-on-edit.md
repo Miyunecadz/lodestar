@@ -7,6 +7,7 @@ recommended: false
 stacks: [has-eslint]
 event: file
 pattern: 'src/.*\.(js|jsx|ts|tsx)$'
+surface: agent
 emits: settings-hook
 ---
 

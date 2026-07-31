@@ -112,7 +112,7 @@ bash install.sh ~/code/my-workspace --ref v0.6.0     # any release from v0.5.0 o
 1. **When-to-load is a first-class field.** Every skill and doc states the task it belongs to, so the AI never loads planning docs while coding, or coding standards while planning.
 2. **Single source of truth.** Knowledge lives in one place (a skill/doc). Agents and commands *reference* it; they never copy it. Copies drift.
 3. **Breadth at the top, depth in the workers.** The orchestrator holds the wide map; delegated agents are narrow roles with a crisp done-condition — narrow *task* scope, not narrow *domain*, is what prevents drift.
-4. **Advisory vs enforced is a deliberate choice.** Not "please don't"; a hook that makes the wrong action impossible.
+4. **Advisory vs enforced is a deliberate choice** — and *enforced for whom* is a second one. Safety rules declare a surface: Claude's tool calls, every committer's pre-commit, or both. A rule that only constrains the assistant is labelled as such rather than implying more.
 5. **Everything is a copyable file.** The catalog *is* the product. Fork it, delete what you dislike, add your own.
 
 ## What Lodestar is *not*

@@ -8,6 +8,19 @@ Totals: **39 entries** — 18 universal · 14 Node·GraphQL·RN · 7 Python·Dja
 
 ---
 
+## 🛡 Enforcement surface
+
+A guardrail is only as universal as the hook that enforces it. Every entry declares a `surface`:
+
+| `surface` | Hook | Holds for |
+|---|---|---|
+| `agent` | `lodestar-guardrails.py` (PreToolUse) | Claude tool-use only |
+| `commit` / `both` | `lodestar-precommit-check.py` (pre-commit) | **any committer** — teammate, IDE, CI |
+
+**Commit-surface entries** (`both`): `block-env-files` · `block-secret-files` · `block-edit-applied-migrations` · `block-edit-applied-migrations-django` · `block-commit-to-default-branch` · `scan-secrets-before-commit`. Installed into the repo's git-hook manager by `/lodestar-guardrails`.
+
+Everything else is `agent`-only, each for a stated reason in its body — usually that legitimate tooling commits those files (`yarn.lock`, `db/schema.sql`, and the freshness hook's own `graph.json`), so a commit-time block would stop correct work. See [`docs/EXTENDING.md`](../../docs/EXTENDING.md).
+
 ## 🌐 Universal core — `stacks: [all]` (works on any stack)
 
 | Kind | Entry | Purpose |
