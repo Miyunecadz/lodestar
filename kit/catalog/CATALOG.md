@@ -97,6 +97,8 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 | `templates/hooks/lodestar-guardrails.py` | the bundled guardrail engine (`/lodestar-guardrails` copies it to `.claude/hooks/`) |
 | `templates/hooks/lodestar-graph-refresh.sh` | graphify-mode **lockstep** pre-commit graph rebuild (`/lodestar-freshness`) |
 | `templates/hooks/lodestar-freshness-check.py` | offline drift detector for architecture maps (`/lodestar-freshness`, `/lodestar-refresh`) |
+| `templates/hooks/lodestar-precommit-check.py` | commit-surface guardrail enforcement for any committer (`/lodestar-guardrails`) |
+| `templates/hooks/lodestar-graph-coverage.py` | graph **completeness** assertion: on-disk code vs graph nodes (`/lodestar-onboard`, `/lodestar-refresh`) |
 | `templates/git/gitattributes-graphify` | union-merge `.gitattributes` for `graph.json` (`/lodestar-freshness`) |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 

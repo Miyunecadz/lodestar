@@ -43,6 +43,7 @@ Present what will be installed and let the user pick:
           run: bash "$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-graph-refresh.sh"
     ```
   - **plain `.git/hooks/pre-commit`** — ensure it invokes `bash .claude/hooks/lodestar-graph-refresh.sh` (append to an existing hook rather than replacing it).
+- **Coverage sanity check (optional, recommended).** Copy `.lodestar/templates/hooks/lodestar-graph-coverage.py` → `.claude/hooks/` alongside the refresh hook. The lockstep hook uses graphify's *incremental* path (fast, per-commit), which is the right trade there — but it means the committed map can lag reality, so a periodic completeness check is what catches an undercount before an agent trusts it. Suggest running it in CI (`--exit-code` fails the build on missing files) rather than on every commit, where it would add latency for little gain.
 - The hook reads the manifest itself: it rebuilds only graphify repos with **staged** code, copies `graph.json`/`GRAPH_REPORT.md`/`graph.html` into `docs/<repo>/architecture/`, `git add`s them + the fingerprint into the same commit, and **always exits 0** (missing tool / failure → hint only). `git commit --no-verify` (or `LEFTHOOK=0`) is the escape hatch.
 
 ## 5. Install the union merge driver (only if chosen, graphify repos)

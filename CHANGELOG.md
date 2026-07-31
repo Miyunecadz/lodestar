@@ -2,6 +2,32 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.9.0] — Unreleased
+
+Graph-completeness pass — a map can be *born* incomplete, and nothing checked. Node counts were never compared against the source tree, so a graph missing whole files looked identical to a complete one. Because `CLAUDE.md` tells agents to prefer querying the graph over re-reading source, that misleads an agent exactly like a stale map does. Closes #5.
+
+### Added
+- **Coverage checker** (`kit/templates/hooks/lodestar-graph-coverage.py`) — compares the code files on disk against the `source_file`s present in `graph.json` and splits the difference four ways: **covered**, **missing** (code graphify would scan but has no nodes → a real gap), **skipped** (excluded on purpose — noise dirs, `.graphifyignore`/`.gitignore`, generated lockfiles), **stale** (graph references a file no longer on disk). Only `missing` is a defect, and the split is what makes the number usable: without it every `node_modules/` file reads as a gap. Manifest mode iterates the onboarded graphify repos; `--graph`/`--root` checks one tree; `--json` feeds the manifest; `--exit-code` gates CI.
+- **Authoritative classification when possible.** "Which files should be covered" is graphify's own question, so the checker imports graphify's real classifier and ignore rules (`classify_file`, `_is_noise_dir`, `_is_ignored`, `.graphifyignore` handling). graphify is normally installed as an isolated tool (uv/pipx), so it also locates the CLI's venv and adds its `site-packages` before giving up. When it genuinely can't import — or a future graphify renames an internal it depends on — it falls back to a bundled copy of the extension list and labels every result **approximate** rather than presenting a guess as exact. The mode is always reported.
+- **`mapping.coverage` + `mapping.build` in the manifest** — `filesTotal` / `filesCovered` / `filesMissing` / `filesSkipped` / `filesStale` / `mode`, so incompleteness is as visible as drift and a later rebuild can be compared against the last one. `/lodestar-refresh` flags a refresh that *lowers* coverage as a regression rather than reporting success.
+- **Coverage test suite** (`.github/scripts/test-coverage.sh`, 27 checks, wired into CI as a sixth gate) — synthetic repo plus hand-written complete / partial / stale graphs, so it needs no graphify install and exercises the fallback classifier. Asserts the missing/skipped/stale split, that `--exit-code` fails only on missing files, manifest iteration with a non-graphify repo skipped, and four degradation paths.
+
+### Changed
+- **Onboarding does a full build, not an incremental one.** `/lodestar-onboard` now runs `graphify extract <repo> --force` (adding `--code-only` when no LLM backend is configured), which skips the incremental manifest gate and semantic cache so the baseline inherits no state from an earlier partial run. `graphify update` stays the right tool for the per-commit lockstep hook, where each commit is a small delta and speed matters — the distinction is now stated in both commands.
+- **`/lodestar-refresh` also rebuilds fully** (`extract --force` rather than `update --force`): the command exists because the map is already known to be wrong, so inheriting incremental state is the wrong trade. It re-checks coverage afterwards, since a refresh is exactly when an undercount surfaces.
+- **`/lodestar-onboard` reports coverage to the user** and never blocks on it — if files are still missing after a full rebuild, it says which ones, and that queries about them will come back empty so that code must be read from source.
+- **`/lodestar-freshness`** suggests running the coverage check in CI (`--exit-code`) rather than per-commit, where it would add latency for little gain.
+- **`install.sh`** refreshes `lodestar-graph-coverage.py` on update, if already installed.
+
+### Notes on scope
+- **The issue's specific evidence did not reproduce, and the fix does not depend on it.** The report was that rebuilding unchanged code found *more* nodes than the committed graph (259 vs 253). On a synthetic repo I saw the opposite asymmetry — the incremental path retained 2 nodes a full rebuild did not produce, while **both** covered 100% of files. Node counts differing between the two paths is expected, since incremental merges into existing state. That is why the assertion here is at **file-coverage** level, which is the invariant that actually matters for "can an agent see this file", rather than a node-count comparison that would be noisy by design.
+- **Exposing a completeness command from graphify itself** (item 3 of the issue) is out of scope for this repo — graphify is a separate project. This implements the Lodestar-side check against the graph it already produces.
+- One real bug surfaced while testing: graphify applies its generated-file skip list (`package-lock.json`, `go.sum`, …) in its **walker**, not in `classify_file`, which reports those files as code. The first version of the checker therefore reported every lockfile as a *missing* file — the exact false-gap failure that makes a coverage number worthless. The skip list is now applied in both modes.
+
+### Upgrading
+
+Nothing to do — existing graphs are untouched. Coverage is recorded the next time a repo is onboarded or refreshed. To check an already-onboarded workspace now: `python3 .lodestar/templates/hooks/lodestar-graph-coverage.py`.
+
 ## [0.8.0] — Unreleased
 
 Enforcement-surface pass — the safety guardrails were `PreToolUse` hooks, so they held against Claude and nobody else. A teammate in their IDE, or CI, could commit exactly what every "safety" rule exists to prevent. Rules now declare which surface they hold on, and commit-surface rules are enforced by a generated pre-commit hook for every committer. Closes #3.

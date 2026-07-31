@@ -40,11 +40,31 @@ Report the detected tags. Tags fall into two kinds: **stack tags** (the ecosyste
 ## 3. Map the architecture (Graphify if installed, else Markdown)
 The "Structure" layer gives the assistant a map to query instead of re-reading source. Produce it one of two ways — never fail this step, and never silently skip it.
 
-- **If the `graphify` CLI is available:** run it against the repo and move/copy its outputs (`graph.html`, `GRAPH_REPORT.md`, `graph.json`) into `docs/REPO/architecture/`. This is the richest, deterministic option. Done.
+- **If the `graphify` CLI is available:** run a **full** build, not an incremental one, so the baseline map is complete on day one:
+  ```bash
+  graphify extract <repo> --force              # full re-scan; add --code-only if no LLM backend is configured
+  ```
+  `--force` skips the incremental manifest gate and semantic cache, so nothing carries over from an earlier partial run. `graphify update` is the *incremental* path — right for the per-commit freshness hook (`/lodestar-freshness`), wrong for the initial baseline, which should not inherit state. Then move/copy the outputs (`graph.html`, `GRAPH_REPORT.md`, `graph.json`) into `docs/REPO/architecture/`.
+- **Assert the graph is complete before trusting it** (see §3b). A map that silently omits real files misleads an agent exactly like a stale one, because `CLAUDE.md` tells agents to prefer the graph over re-reading source.
 - **If Graphify is NOT installed:** do not assume. Ask the user (AskUserQuestion) how to proceed, with two options:
   1. **Install Graphify first, then re-run** *(richest, deterministic)* — Graphify installs entirely at **user level, no sudo**. Show the commands: `uv tool install graphifyy` (or `pipx install graphifyy`), then `graphify install`. Then **pause onboarding** — tell the user to re-run `/lodestar-onboard $ARGUMENTS` once installed, and stop at this step (still do nothing destructive). Do NOT proceed to later steps in this run.
   2. **Generate Markdown docs now** *(zero install, works anywhere)* — explore the repo (Glob/Grep/Read; dispatch the Explore agent if available) and write `docs/REPO/architecture/overview.md` by hand: entry points, a module/directory map, the key runtime flows, a mermaid diagram, and a "where to find X" table. This is what the `architecture-overview` skill consumes. It is **not** machine-queryable JSON like Graphify and can drift (re-generate to refresh), but it removes the install burden and needs no external tool.
 - Optionally mention the deterministic middle ground for later: `ast-grep` (`npm i -g @ast-grep/cli`, no sudo) for structural queries across ~20 languages.
+
+## 3b. Completeness check (graphify repos only)
+
+Node counts are never compared against the source tree, so a partial map looks exactly like a complete one. Run the check and **show the user the numbers**:
+
+```bash
+python3 .lodestar/templates/hooks/lodestar-graph-coverage.py \
+  --graph docs/REPO/architecture/graph.json --root ./REPO
+```
+
+It splits the difference four ways: **covered** (has nodes), **missing** (code graphify would scan, but no nodes → a real gap), **skipped** (excluded on purpose — noise dirs, `.graphifyignore`/`.gitignore`, generated lockfiles), and **stale** (graph references a file no longer on disk). Only `missing` is a defect; the split is what makes the number meaningful, since otherwise every `node_modules/` file reads as a gap.
+
+- **Missing files reported** → rebuild once with `graphify extract <repo> --force` and re-check. If files are *still* missing, do not silently commit a partial map: tell the user which files have no nodes, and note that queries about them will come back empty so those parts need reading from source.
+- The checker reports whether it used graphify's **own** classifier (authoritative) or its bundled fallback list (**approximate** — graphify not importable from this interpreter). Pass the distinction on rather than presenting an approximate number as exact.
+- Never block onboarding on this. Report, record, continue.
 
 Record which path was taken (graphify / markdown / deferred) so a later re-run is unambiguous. This becomes the repo's `architecture` in the manifest (step 6) and decides how `/lodestar-freshness` keeps the map current.
 
@@ -93,10 +113,18 @@ Keep the filename `api-contract.md` either way — the cross-links in the other 
     "stacks": [ ... ],
     "architecture": "graphify|markdown|deferred",
     "docs": "docs/REPO/",
-    "mapping": { "lastMappedSha": "<HEAD sha>", "lastMappedAt": "<ISO-8601 UTC>" }
+    "mapping": {
+      "lastMappedSha": "<HEAD sha>",
+      "lastMappedAt": "<ISO-8601 UTC>",
+      "build": "full",
+      "coverage": {
+        "filesTotal": 0, "filesCovered": 0, "filesMissing": 0,
+        "filesSkipped": 0, "filesStale": 0, "mode": "graphify|fallback"
+      }
+    }
   }
   ```
-  Include `mapping` only when a map was actually produced (omit it for a **deferred** architecture). Merge any newly installed skills into `skills`.
+  Include `mapping` only when a map was actually produced (omit it for a **deferred** architecture). `coverage` comes from §3b (graphify repos only) — recording it makes incompleteness as visible as drift, and lets a later run see whether coverage regressed. `build: full` records that the baseline was a full extraction. Merge any newly installed skills into `skills`.
 
 ## 7. Report
-Summarize: stacks detected, graph status, docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`), delegation (`/lodestar-agents`), and **map freshness** (`/lodestar-freshness` — keeps the architecture map in sync with the code so a stale graph never misleads an agent) are separate opt-in commands they can now run, since the stacks and architecture are known.
+Summarize: stacks detected, graph status **including coverage** (`N/M code files covered`, and the count of any missing files — say plainly if the graph is incomplete and which files an agent therefore cannot see), docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`), delegation (`/lodestar-agents`), and **map freshness** (`/lodestar-freshness` — keeps the architecture map in sync with the code so a stale graph never misleads an agent) are separate opt-in commands they can now run, since the stacks and architecture are known.
