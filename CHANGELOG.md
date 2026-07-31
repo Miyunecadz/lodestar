@@ -2,6 +2,35 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.11.0] — Unreleased
+
+Design-guidance pass — Lodestar *referenced* Anthropic's `frontend-design` skill but only as a soft, opt-in dependency, so a frontend workspace could generate UI with no anti-slop guidance behind it and no signal that anything was missing. Closes #6.
+
+### Added
+- **`design-guidance-on-ui-edits`** — warns on edits to UI files while `designGuidance.installed` is false in the manifest, naming the two commands that fix it. It is **self-silencing**: once guidance is recorded it never fires again, and if the plugin was *declined* it keeps reminding rather than going quiet forever. A workspace with no manifest still gets the reminder — failing toward visible is the point.
+- **`requires_manifest_missing` engine flag** — a rule fires only while a dotted manifest path is absent, `false`, or empty. This is the general primitive behind the above: it makes a reminder self-silencing instead of a permanent nag (which trains people to ignore every warn) or a one-shot message (indistinguishable from no rule). Documented in `docs/EXTENDING.md` with the failure-direction caveat.
+- **`docs/spikes/impeccable-design-detector.md`** — the evaluation issue #6 asked for, with a decision and reasons.
+
+### Changed
+- **`ui-designer` is `recommended: true`.** It stays frontend-scoped, so it is pre-checked by default in exactly the workspaces that have a frontend and stays invisible in a backend-only one. A detected frontend no longer ends up with no design role at all.
+- **Declining the `frontend-design` plugin is recorded and re-offered.** `/lodestar-agents` §5b now puts **install** first and marked recommended, then writes `designGuidance` (`skill` / `installed` / `decidedAt`, plus `status: declined`) into the manifest. A later run re-asks instead of treating one decline as permanent, and the report says plainly that UI has no anti-slop guidance behind it. The command must only write `installed: true` once the skill is genuinely available — a wrongly-recorded `true` silences the backstop for good.
+- **`ui-designer`'s fallback text** now says it flags missing guidance *every* time, not once, and that proceeding without it is a quality cliff rather than a neutral choice.
+
+### Spike outcome: Impeccable — defer, with a documented path
+
+Issue #6 recommended evaluating [Impeccable](https://impeccable.style/) (Apache 2.0, free, by Paul Bakaus) as a stronger, deterministic complement. Verified today: the detector is real and genuinely LLM-free (`npx impeccable detect src/`, `--json` for CI), and the architectural claim in the issue is right — a no-LLM rules engine flagging anti-patterns pre-ship is the same shape as Lodestar's guardrail engine.
+
+**Deferred as a guardrail-engine entry**, for four reasons: the engine is Python-stdlib-only and offline, and shelling out to `npx` on every UI edit puts a process spawn (and possible package fetch) on the hot path, where a rule that cannot run degrades to "allow"; the rule set is moving fast (reported as 46 in the issue, 59 on the site today, 60 elsewhere today), which is a good sign upstream and a poor basis for a pinned catalog entry whose text must describe what it enforces; exit codes are not in the documented CLI contract yet, and building a blocking gate on an undocumented exit code is how an upgrade breaks everyone's commits; and it is a *quality linter*, for which Lodestar already has the right shape — `emits: settings-hook` and CI — rather than the mechanism that blocks committing a private key.
+
+The spike documents both integration paths (a `has-impeccable`-gated settings-hook entry, or a `npx impeccable detect --json` CI step), so adopting it later needs no engine changes. Nothing here blocks it.
+
+### Notes on scope
+- **Item C of the issue was not implementable as written.** It asked for a guardrail that fires when "no design skill is loaded in the session" — a `PreToolUse` hook has no view of which skills are loaded. The rule checks recorded workspace state instead (`designGuidance.installed`), which is the same intent and is actually checkable. Flagged before implementing.
+
+### Upgrading
+
+Re-run `/lodestar-agents` in a frontend workspace: `ui-designer` is now pre-checked, and the plugin prompt records its outcome. Re-run `/lodestar-guardrails` to pick up `design-guidance-on-ui-edits`. Until then nothing changes.
+
 ## [0.10.0] — Unreleased
 
 Catalog-coverage pass — onboarding a Laravel/PHP + Next.js monorepo produced **zero** stack-specific entries for either repo, two of the most common web stacks, and the gap was recorded only as a string in the manifest. Closes #4.

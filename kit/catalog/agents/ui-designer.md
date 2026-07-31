@@ -2,7 +2,7 @@
 id: ui-designer
 title: UI designer (intentional visual design)
 axis: stack-scoped
-recommended: false
+recommended: true
 stacks: [react-craco, react-native, has-frontend]
 tools: [Read, Edit, Write, Grep, Glob, Bash]
 loads: [frontend-design]
@@ -23,4 +23,6 @@ You build or reshape UI with a **coherent, intentional visual system** — not f
 3. Implement the UI within the feature's files. Respect responsive behavior, light/dark where the app supports it, and accessibility basics (labels, focus, contrast) — hand off a deep audit to `accessibility-reviewer`.
 4. Respect every workspace guardrail. If the change needs backend or data work, stop and hand back — you own the UI surface, not the wiring.
 
-If the `frontend-design` skill is unavailable, say so and proceed with sound defaults, but flag that the design guidance was missing.
+If the `frontend-design` skill is unavailable, say so and proceed with sound defaults, but flag that the design guidance was missing — every time, not once. Proceeding without it is a quality cliff, not a neutral choice.
+
+`recommended: true` here is scoped by `stacks`: this agent is only ever offered where a frontend stack is detected, so it is pre-checked by default in exactly those workspaces and invisible in a backend-only one. A detected frontend should not end up with no design role at all — that was the silent path this closes. [[design-guidance-on-ui-edits]] is the backstop if you skip it anyway.

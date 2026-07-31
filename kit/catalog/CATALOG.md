@@ -4,7 +4,7 @@ Lodestar's catalog is organized into a **universal core** that works on any stac
 
 > Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../../docs/EXTENDING.md`](../../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
 
-Totals: **49 entries** — 18 universal · 14 Node·GraphQL·RN · 7 Python·Django · 7 Laravel·PHP · 3 Next.js.
+Totals: **50 entries** — 18 universal · 15 Node·GraphQL·React·RN·frontend · 7 Python·Django · 7 Laravel·PHP · 3 Next.js.
 
 ---
 
@@ -35,6 +35,7 @@ Everything else is `agent`-only, each for a stated reason in its body — usuall
 | guardrail | `protect-generated-files` | block edits to generated/binary artifacts |
 | guardrail | `verifier-before-commit` | remind to run the reviewer on the staged diff |
 | guardrail | `commit-message-style` | one-line commit messages, no co-author trailer |
+| guardrail | `design-guidance-on-ui-edits` | warn on UI edits while no design guidance is installed (`has-frontend`, self-silencing) |
 | agent | `reviewer` | read-only staged-diff audit, findings by severity |
 | agent | `security-auditor` | read-only deep security audit (adaptive: backends/APIs) |
 | agent | `docs-writer` | keep docs/ & `_shared/` in sync with code changes |
@@ -45,6 +46,8 @@ Everything else is `agent`-only, each for a stated reason in its body — usuall
 | skill | `architecture-overview` | big-picture / cross-repo flow tracing |
 
 > Adaptive picks: `/lodestar-agents` pre-checks `security-auditor` when a backend/API or `has-auth` is detected, and `ui-designer` + `accessibility-reviewer` when a frontend is detected — even though those last two are frontend-scoped (below). Detection feeds the picker; the catalog stays authoritative.
+>
+> `ui-designer` is `recommended: true` **and** frontend-scoped, so a detected frontend gets a design role by default and a backend-only workspace never sees it. Skip it anyway and `design-guidance-on-ui-edits` keeps saying so on UI edits until guidance is recorded in the manifest — declining is allowed, going silently unguided is not.
 
 ## ⬡ Node · GraphQL · React · React Native pack
 

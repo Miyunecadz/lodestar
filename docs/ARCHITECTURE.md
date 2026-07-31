@@ -223,6 +223,7 @@ Choices made during design, with the reasoning, so forks can revisit them delibe
 - **v0.8 (unreleased)** — enforcement surfaces (`agent`/`commit`/`both`) and a generated pre-commit checker, so safety rules hold for every committer (issue #3).
 - **v0.9 (unreleased)** — full build at onboard time plus a graph completeness assertion and `mapping.coverage` in the manifest (issue #5).
 - **v0.10 (unreleased)** — Laravel·PHP and Next.js catalog packs; a detected catalog gap now generates a workspace `docs/EXTENDING.md` and is reported, not buried in the manifest (issue #4).
+- **v0.11 (unreleased)** — design guidance is default-on for frontend workspaces; declines are recorded and re-offered; a self-silencing guardrail flags UI edits made without it. Impeccable evaluated and deferred with a documented path (issue #6, `docs/spikes/`).
 - **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; a `commit-msg` surface for message style and a `pre-push` surface for force-push.
 
 See [`CONCEPTS.md`](CONCEPTS.md) for the mental models and [`EXTENDING.md`](EXTENDING.md) to add your own catalog entries.
