@@ -66,6 +66,19 @@ stacks: [react-native]
 ---
 Use patch-package.
 EOF
+cat > "$WORK/.claude/guardrails/design-guidance.md" <<'EOF'
+---
+name: design-guidance-on-ui-edits
+enabled: true
+event: file
+pattern: '\.(tsx|jsx|vue|svelte)$'
+severity: warn
+stacks: [has-frontend]
+requires_manifest_missing: designGuidance.installed
+surface: agent
+---
+No design guidance is installed for this workspace.
+EOF
 cat > "$WORK/.claude/guardrails/on-default-branch.md" <<'EOF'
 ---
 name: block-commit-to-default-branch
@@ -141,5 +154,30 @@ EOF
 expect "node_modules in RN repo deny"     DENY  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/mobile/node_modules/p/index.js\"}}"
 expect "node_modules in web repo allow"   ALLOW "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/web/node_modules/p/index.js\"}}"
 expect "node_modules outside repos deny"  DENY  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/tools/node_modules/p/index.js\"}}"
+
+# --- requires_manifest_missing: a reminder that silences itself (issue #6) -----------
+mkdir -p "$WORK/ui"
+cat > "$WORK/.claude/lodestar.manifest.json" <<EOF
+{"repos":[{"name":"ui","path":"$WORK/ui","stacks":["has-frontend"]}]}
+EOF
+expect "UI edit warns while guidance missing" WARN \
+  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/ui/Button.tsx\"}}"
+cat > "$WORK/.claude/lodestar.manifest.json" <<EOF
+{"repos":[{"name":"ui","path":"$WORK/ui","stacks":["has-frontend"]}],
+ "designGuidance":{"installed":false,"status":"declined"}}
+EOF
+expect "still warns after a decline"          WARN \
+  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/ui/Button.tsx\"}}"
+cat > "$WORK/.claude/lodestar.manifest.json" <<EOF
+{"repos":[{"name":"ui","path":"$WORK/ui","stacks":["has-frontend"]}],
+ "designGuidance":{"installed":true,"skill":"frontend-design"}}
+EOF
+expect "silent once guidance is recorded"     ALLOW \
+  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/ui/Button.tsx\"}}"
+expect "non-UI file never warns"              ALLOW \
+  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/ui/server.py\"}}"
+rm -f "$WORK/.claude/lodestar.manifest.json"
+expect "no manifest → reminder still appears" WARN \
+  "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/ui/Button.tsx\"}}"
 
 echo "✅ engine smoke test passed"

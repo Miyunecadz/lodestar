@@ -28,6 +28,8 @@ per invocation:
     match: argv                   # bash rules: match shell words, not the raw string
     allow_paths: ['^/tmp/']       # bash rules: skip when every operand is under an allowed prefix
     ignore_case: false            # opt out of the default case-insensitive match
+    requires_manifest_missing: k  # fire only while manifest key `k` is absent/false — a
+                                  # reminder that silences itself once the gap is closed
 
 Design notes:
 - stdlib only; never raises out of the hook — on any error it allows the action (exit 0).
@@ -284,6 +286,24 @@ class Context:
             self._cache["manifest"] = data
         return self._cache["manifest"]
 
+    def manifest_missing(self, dotted: str) -> bool:
+        """Is this dotted manifest path absent, false, or empty?
+
+        Lets a rule be a *self-silencing* reminder: it fires while some setup is missing
+        and goes quiet once the manifest records it, instead of nagging forever (which
+        trains people to ignore it) or being silent from the start (which is the gap).
+        Note the direction of failure: no manifest at all means "missing", so the
+        reminder appears rather than being suppressed by its own absence.
+        """
+        node = self.manifest
+        for part in str(dotted).split("."):
+            if not isinstance(node, dict) or part not in node:
+                return True
+            node = node[part]
+        if isinstance(node, (list, dict, str)):
+            return len(node) == 0
+        return not bool(node)
+
     def stacks_for(self, path: str):
         """Detected stacks of the repo containing `path`, or None when unknown.
 
@@ -362,6 +382,10 @@ def stack_allows(rule: dict, ctx: Context, scope: str) -> bool:
 
 def suppressed(rule: dict, ctx: Context, event: str, tool_input: dict) -> bool:
     """Does the context say this match should not fire after all?"""
+    needs_missing = rule.get("requires_manifest_missing")
+    if needs_missing and not ctx.manifest_missing(needs_missing):
+        return True  # the thing this rule reminds about is recorded — stay quiet
+
     if event == "file":
         if rule.get("allow_if_untracked") is True:
             path = tool_input.get("file_path", "")
