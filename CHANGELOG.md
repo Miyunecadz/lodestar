@@ -2,6 +2,28 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.7.0] — Unreleased
+
+Distribution pass — installing Lodestar no longer leaves you holding a clone you never asked for, and updates move between released tags instead of pulling whatever is on `main`. Closes #9.
+
+### Added
+- **Bootstrap installer — no persistent clone.** `curl -fsSL <raw-url>/install.sh | bash -s -- <workspace>` fetches the kit into a temp dir (shallow clone of a release tag), copies it in, and removes the temp dir. A script read from stdin has no location, so this is detected by the absence of a `kit/` directory next to the script — never by falling back to the current directory, which would silently pick up an unrelated `kit/`.
+- **`--ref` / `LODESTAR_REF` to pin a version.** `install.sh <workspace> --ref v0.6.0` installs a specific release. An explicit ref always fetches from the remote, even when run from a clone — otherwise it would install whatever the clone had checked out while recording the tag the user asked for.
+- **`.lodestar/source.json`** — records `kind` (`remote`/`local`), `origin` (URL or clone path), `ref`, and `version`: enough to update from, deliberately not a clone. `.lodestar/SOURCE` is still written for compatibility with installs that predate this.
+- **Installer smoke test** (`.github/scripts/test-install.sh`, 24 checks, wired into CI) — clone mode, re-run/update mode, generated content surviving an update, piped bootstrap picking the newest tag, no temp dir or clone left behind, `--ref` pinning, and four refusals that must write nothing. Builds a throwaway local git repo as the "remote", so it needs no network. CI also shellchecks the test itself.
+
+### Changed
+- **`/lodestar-update` is remote-aware and tag-based.** With a `remote` source it resolves the newest release tag (`git ls-remote --tags`), fetches it into a temp dir, re-syncs, and cleans up. With a `local` source it keeps today's `git pull --ff-only` + local re-run, so contributors and offline installs behave exactly as before. `/lodestar-update <version>` pins or rolls back to any release from v0.5.0 onward; a rollback is called out as such before it runs. On a local install an explicit version reads the clone's `origin` URL and fetches the tag rather than mutating the user's working copy.
+- **README splits the user path from the contributor path** — bootstrap one-liner first (with a download-and-read-first alternative), then install-from-a-clone for offline/air-gapped/contributing, then a note on what each mode records and how updates differ. `git` is now listed under requirements.
+
+### Fixed
+- **`install.sh` exited 1 on every successful run.** The `EXIT` trap's last command was a `[ -n "$TMP_DIR" ]` test that fails when there is no temp dir, and a failing final command in an exit trap becomes the script's exit status — so callers (including `/lodestar-update`) saw a successful install as a failure. The handler now returns 0 explicitly.
+- **A tag older than v0.5.0 failed mid-copy.** Those tags predate the `kit/` layout, so `cp` aborted partway with a cryptic error after files had already been written. The installer now checks for `kit/` right after fetching and refuses with instructions to use that tag's own installer, leaving the workspace untouched.
+
+### Upgrading
+
+Existing clone-based installs keep working with no action — `source.json` is written on the next update and records the clone path, preserving `git pull` + re-install. To stop carrying a clone: re-install with the bootstrap one-liner over the same workspace (generated content is untouched), then delete the clone.
+
 ## [0.6.0] — Unreleased
 
 Guardrail engine pass — rules were stateless regex matchers, so several shipped rules over-blocked legitimate work or under-enforced what their names promised. The engine now computes a small context layer that rules opt into declaratively. Closes #11.

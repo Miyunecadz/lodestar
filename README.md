@@ -62,27 +62,50 @@ Everything self-extends through commands that share one engine: **detect the sta
 
 Add a new repo later? `/lodestar-onboard ./new-service` and it's absorbed — the router never changes.
 
-**Updating.** Run **`/lodestar-update`** from the workspace to pull the latest Lodestar and re-sync the kit (catalog, templates, commands, guardrail engine) **without touching anything you generated** — your rules, agents, docs, and manifest are left as-is. New catalog entries appear the next time you re-run `/lodestar-guardrails` or `/lodestar-agents`. (Equivalently: `cd ~/tools/lodestar && git pull && ./install.sh ~/code/my-workspace` — re-running the installer is safe.)
+**Updating.** Run **`/lodestar-update`** from the workspace. It fetches the latest **released version** and re-syncs the kit (catalog, templates, commands, guardrail engine) **without touching anything you generated** — your rules, agents, docs, and manifest are left as-is. New catalog entries appear the next time you re-run `/lodestar-guardrails` or `/lodestar-agents`.
+
+Updates move between release tags, never to the tip of `main`, so they're reproducible and reversible: `/lodestar-update 0.5.0` pins or rolls back to a specific version.
 
 ## Quickstart
 
 ```bash
-# 1. Clone Lodestar somewhere
-git clone https://github.com/Miyunecadz/lodestar.git ~/tools/lodestar
-# (or via SSH: git clone git@github.com:Miyunecadz/lodestar.git ~/tools/lodestar)
+# 1. Install Lodestar into a workspace that contains your repos.
+#    Fetches the latest release, copies the kit in, leaves no clone behind.
+curl -fsSL https://raw.githubusercontent.com/Miyunecadz/lodestar/main/install.sh \
+  | bash -s -- ~/code/my-workspace
 
-# 2. Install it into a workspace that contains your repos
-~/tools/lodestar/install.sh ~/code/my-workspace
-
-# 3. Launch Claude Code from the workspace root and initialize
+# 2. Launch Claude Code from the workspace root and initialize
 cd ~/code/my-workspace
 claude
 > /lodestar-init
 > /lodestar-onboard ./backend
 > /lodestar-onboard ./frontend
-> /lodestar-guardrails        # tick the safety + quality rules you want
+> /lodestar-guardrails    # tick the safety + quality rules you want
 > /lodestar-agents        # tick the role agents you want
 ```
+
+Prefer to read a script before running it? Download it first, or clone and install from the clone — both do the same thing:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Miyunecadz/lodestar/main/install.sh
+less install.sh && bash install.sh ~/code/my-workspace
+```
+
+**Install from a clone (offline, air-gapped, or contributing).** The installer copies from a `kit/` directory next to itself when there is one, so this path needs no network at all:
+
+```bash
+git clone https://github.com/Miyunecadz/lodestar.git ~/tools/lodestar
+# (or via SSH: git clone git@github.com:Miyunecadz/lodestar.git ~/tools/lodestar)
+~/tools/lodestar/install.sh ~/code/my-workspace
+```
+
+A clone install records the clone's **path**, so `/lodestar-update` keeps doing `git pull` + re-install from it — offline updates keep working. A bootstrap install records the **repo URL and tag** instead, and updates re-fetch from there. Either way `.lodestar/` holds metadata, not a clone. Pin a specific version with `--ref`:
+
+```bash
+bash install.sh ~/code/my-workspace --ref v0.6.0     # any release from v0.5.0 onward
+```
+
+> **Users vs contributors.** As a user you never need a clone: bootstrap, then configure with the slash commands. As a contributor you want the clone — it's the product source, and this repo's own `.claude/` is dev tooling, not part of the kit (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
 ## Design principles (the short version)
 
@@ -113,6 +136,7 @@ claude
 - [Claude Code](https://code.claude.com)
 - Optional: [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs — installs at **user level, no sudo** (`uv tool install graphifyy` or `pipx install graphifyy`, then `graphify install`). If it's absent, `/lodestar-onboard` offers to generate a Markdown `architecture/overview.md` instead, so it's never required.
 - For guardrails: **Python 3** (stdlib only — no packages, no plugin). The engine (`.claude/hooks/lodestar-guardrails.py`) is bundled and installed by `/lodestar-guardrails`.
+- **git** — for the workspace itself, and for the bootstrap installer and `/lodestar-update` to fetch a release. Installing from a clone needs git only for the clone.
 
 ## Cost & model guidance
 

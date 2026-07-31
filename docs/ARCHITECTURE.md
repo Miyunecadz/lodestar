@@ -215,6 +215,7 @@ Choices made during design, with the reasoning, so forks can revisit them delibe
 - **v0.3 (unreleased)** — branding + collision-safe `lodestar-*` commands; re-runnable installer + `/lodestar-update`; CI / release pipeline.
 - **v0.4 (unreleased)** — **graph freshness**: per-repo mapping fingerprint; graphify **lockstep** pre-commit rebuild + union merge driver; markdown-mode drift detection + `/lodestar-refresh`; transport-aware `/lodestar-freshness` installer.
 - **v0.6 (unreleased)** — guardrail engine context layer (git / stack / shell), enforced `stacks:` scoping, shell-aware destructive-command matching, branch-aware trunk protection (issue #11).
+- **v0.7 (unreleased)** — bootstrap installer (no persistent clone), remote + tag-pinned updates via `.lodestar/source.json`, `/lodestar-update <version>` rollback (issue #9).
 - **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; a completeness assertion for the graph (see issue #5); mirror `commit`-surface guardrails into the git-hook layer (issue #3).
 
 See [`CONCEPTS.md`](CONCEPTS.md) for the mental models and [`EXTENDING.md`](EXTENDING.md) to add your own catalog entries.

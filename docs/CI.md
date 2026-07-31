@@ -7,11 +7,11 @@ branches, and every change reaching `main` goes through a pull request.
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ci.yml` | every PR + push to `main` | shellchecks `install.sh`, validates the catalog + `VERSION`↔`CHANGELOG`, and smoke-tests the guardrail engine. **This is the required status check.** |
+| `ci.yml` | every PR + push to `main` | shellchecks `install.sh` and the installer test, validates the catalog + `VERSION`↔`CHANGELOG`, and smoke-tests the guardrail engine and the installer. **This is the required status check.** |
 | `release.yml` | push to `main` that changes `VERSION` | tags `vX.Y.Z` and cuts a GitHub Release from that version's `CHANGELOG` section. No manual tagging. |
 | `guard-default-branch.yml` | push to `main` | **backstop**: fails if a commit reached `main` without a merged PR (see the note below). |
 
-Helper scripts live in `.github/scripts/` (`validate.py`, `test-engine.sh`) and run locally too.
+Helper scripts live in `.github/scripts/` (`validate.py`, `test-engine.sh`, `test-install.sh`) and run locally too. `test-install.sh` builds a throwaway local git repo as its "remote", so it exercises the bootstrap and tag-pinning paths without network access.
 
 ## Cutting a release (trunk-based)
 
