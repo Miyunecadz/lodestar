@@ -57,11 +57,44 @@ Rules can also opt into a **context layer** the engine computes per invocation (
 ## 5. Write the selected rules — into the `.claude/guardrails/` folder
 For each chosen entry:
 - If `emits: rule`: write `.claude/guardrails/<id>.md` with frontmatter `name: <id>`, `enabled: true`, `event`, `pattern`, `severity` (`block`/`warn`), and the message body from the catalog entry — copied verbatim (a `block` message must redirect to the correct alternative, not just deny). Keeping one rule per file in this folder is the whole point: `.claude/` root stays clean.
-  - **Copy the catalog entry's `stacks` and any context flags too** — `stacks`, `allow_if_untracked`, `only_on_default_branch`, `match`, `allow_paths`, `ignore_case`. These are what the engine's context layer reads; a rule installed without them silently loses its scoping and fires everywhere. Copy the values verbatim, including list syntax (`stacks: [react-native]`).
+  - **Copy the catalog entry's `stacks`, context flags, and surface fields too** — `stacks`, `allow_if_untracked`, `only_on_default_branch`, `match`, `allow_paths`, `ignore_case`, `surface`, `commit_check`, `commit_severity`. These are what the engine's context layer reads; a rule installed without them silently loses its scoping and fires everywhere. Copy the values verbatim, including list syntax (`stacks: [react-native]`).
 - If `emits: settings-hook`: add the corresponding hook to `.claude/settings.json` directly (e.g. a per-repo lint **router** that must run a linter after an edit — that needs shell logic the declarative engine doesn't do). This is the only case that still writes into `settings.json` beyond the engine registration above.
 
 Never write secrets into any rule file — they hold patterns and guidance only, and are safe to commit and share.
 
-## 6. Update the manifest & report
+## 6. Install the commit surface (opt-in — this is what covers non-Claude commits)
+
+The engine from §4 is a **PreToolUse** hook: it only fires when *Claude* is about to act. A teammate editing in their IDE, or CI, never touches that path — so a rule labelled "safety" is, by itself, enforced against one committer out of many. Rules that must hold for **any** committer declare it in frontmatter:
+
+| `surface` | Where it holds |
+|---|---|
+| `agent` | Claude tool-use only (the PreToolUse engine) |
+| `commit` | any committer (the pre-commit checker) |
+| `both` | both surfaces |
+
+If any selected rule has `surface: commit` or `both`, offer to install the commit surface (AskUserQuestion, recommended). Be honest about the trade: it holds for everyone, and `git commit --no-verify` remains a deliberate bypass. If the user declines, say plainly which rules therefore hold **for Claude only** — that is the false-sense-of-security this step exists to remove.
+
+**a. Copy the checker.** `.lodestar/templates/hooks/lodestar-precommit-check.py` → `.claude/hooks/lodestar-precommit-check.py`. It reads the same `.claude/guardrails/*.md` files, keeps the ones with a `commit`/`both` surface, and applies them to the **staged** change: `staged-paths` matches the rule pattern against staged paths (honoring `allow_if_untracked` — at commit time `A` is a new file, `M` an already-committed one), `secret-scan` inspects the staged diff, `default-branch` refuses a direct trunk commit. It exits 1 only on a `block` match; anything else — a warn, no rules, a missing tool, an internal error — exits 0.
+
+**b. Detect the git-hook manager and integrate without clobbering.** Same detection as `/lodestar-freshness`, and the two must **coexist** — each adds its own distinct entry, never replacing the other's:
+- **lefthook** (`lefthook.yml`) → add under `pre-commit.commands`:
+  ```yaml
+  pre-commit:
+    commands:
+      lodestar-guardrails:
+        run: python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-precommit-check.py"
+  ```
+- **husky** (`.husky/`) → append the `python3 …` line to `.husky/pre-commit`.
+- **`core.hooksPath` set** → write into that directory, chaining any existing hook.
+- **none** → write `.git/hooks/pre-commit` and `chmod +x`, chaining an existing hook rather than overwriting it.
+
+Confirm the detected manager with the user before writing. In a **separate sub-repos** layout install into each repo you want covered; the checker walks up from the git root to find the workspace's `.claude/guardrails/` (or honors `LODESTAR_WORKSPACE`).
+
+**c. Note the gap that remains.** Tell the user which selected rules are `agent`-only and why they cannot move to the commit surface — e.g. lockfiles and `db/schema.sql` are *supposed* to be committed by tooling, so a commit-time check cannot tell a legitimate regeneration from a hand-edit; force-push is a `pre-push` concern; commit-message style needs a `commit-msg` hook. For trunk protection that nobody can bypass, point at a server-side branch ruleset (`docs/CI.md`).
+
+**d. Recommend `gitleaks` if `scan-secrets-before-commit` was selected.** With it installed the secret scan **blocks**; without it the built-in patterns only **warn**, because heuristics precise enough to nag are not precise enough to stop a teammate's commit.
+
+## 7. Update the manifest & report
 - Set `.claude/lodestar.manifest.json` `guardrails` to the enabled ids.
-- Report what was enabled, grouped by block vs warn, and note that rules live in `.claude/guardrails/` enforced by `.claude/hooks/lodestar-guardrails.py`. Explain how to disable one: set `enabled: false` in its `.claude/guardrails/<id>.md` (or delete the file), or re-run this command and untick it. Changes take effect on the next tool call — no restart.
+- If the commit surface was installed, record it: `"guardrailSurfaces": { "commit": { "hookManager": "lefthook|husky|hooksPath|git-hooks", "rules": [ ...ids... ] } }`.
+- Report what was enabled, grouped by block vs warn, **and by surface** — make explicit which rules hold for every committer and which are Claude-only. Note that rules live in `.claude/guardrails/` enforced by `.claude/hooks/lodestar-guardrails.py` (agent) and `.claude/hooks/lodestar-precommit-check.py` (commit). Explain how to disable one: set `enabled: false` in its `.claude/guardrails/<id>.md` (or delete the file), or re-run this command and untick it. Changes take effect on the next tool call — no restart.
