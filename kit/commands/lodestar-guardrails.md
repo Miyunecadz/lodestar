@@ -52,9 +52,12 @@ Lodestar enforces `emits: rule` guardrails with its own **self-contained engine*
   ```
 The engine reads every rule in `.claude/guardrails/*.md` on each matching tool call: `block` rules deny the action (with the redirect message); `warn` rules surface the message without stopping. `file` rules match the edited **path**; `bash` rules match the **command**.
 
+Rules can also opt into a **context layer** the engine computes per invocation (git tracked-status and branch, the target repo's stacks from the manifest, shell-word tokenization) — that is what makes `stacks:` actually scope a rule and lets a migration guard allow the file you just created. Every probe fails protective: no git, no manifest, or an unparseable command means the rule behaves as a plain pattern match. See `docs/EXTENDING.md` for the flags.
+
 ## 5. Write the selected rules — into the `.claude/guardrails/` folder
 For each chosen entry:
 - If `emits: rule`: write `.claude/guardrails/<id>.md` with frontmatter `name: <id>`, `enabled: true`, `event`, `pattern`, `severity` (`block`/`warn`), and the message body from the catalog entry — copied verbatim (a `block` message must redirect to the correct alternative, not just deny). Keeping one rule per file in this folder is the whole point: `.claude/` root stays clean.
+  - **Copy the catalog entry's `stacks` and any context flags too** — `stacks`, `allow_if_untracked`, `only_on_default_branch`, `match`, `allow_paths`, `ignore_case`. These are what the engine's context layer reads; a rule installed without them silently loses its scoping and fires everywhere. Copy the values verbatim, including list syntax (`stacks: [react-native]`).
 - If `emits: settings-hook`: add the corresponding hook to `.claude/settings.json` directly (e.g. a per-repo lint **router** that must run a linter after an edit — that needs shell logic the declarative engine doesn't do). This is the only case that still writes into `settings.json` beyond the engine registration above.
 
 Never write secrets into any rule file — they hold patterns and guidance only, and are safe to commit and share.

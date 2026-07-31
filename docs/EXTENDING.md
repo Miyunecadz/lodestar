@@ -26,7 +26,9 @@ severity: warn
 recommended: false
 stacks: [all]
 event: bash
-pattern: 'git commit'
+pattern: '(^|[;&|]\s*)git(\s+-\S+)*\s+commit\b'
+only_on_default_branch: true
+match: argv
 emits: rule
 ---
 You appear to be committing on a protected branch. Create a feature branch first:
@@ -34,6 +36,28 @@ You appear to be committing on a protected branch. Create a feature branch first
 ```
 
 The picker writes this to `.claude/guardrails/warn-direct-main-edits.md`; the bundled engine (`.claude/hooks/lodestar-guardrails.py`) picks it up on the next tool call — no restart, no plugin.
+
+### Context flags — when a pattern is not enough
+
+A pattern only sees a string. Rules whose intent depends on state a regex cannot observe — is this file committed yet, which repo is it in, am I on trunk, is that `rm -rf` inside a quoted argument — opt into the engine's **context layer**:
+
+| Flag | Event | Effect |
+|---|---|---|
+| `stacks: [a, b]` | both | Skip the rule unless the target repo's detected stacks (from the manifest) include one of these, or `all`. Without this the rule fires in every repo. |
+| `allow_if_untracked: true` | `file` | Skip for a file git does not track yet — the "you may write the migration you just created" carve-out. |
+| `only_on_default_branch: true` | `bash` | Fire only when HEAD is positively known to be the repo's default branch. |
+| `match: argv` | `bash` | Match the command's *unquoted* words instead of the raw string, so quoted or echoed text that runs nothing cannot trip the rule. Payloads passed to a nested shell (`bash -c "…"`, `eval "…"`) are still matched. |
+| `allow_paths: ['^/tmp/']` | `bash` | Skip when **every** operand is an absolute path matching one of these prefixes. Relative operands and compound commands (`&&`, `;`, `\|`, `$(…)`) never qualify. |
+| `ignore_case: false` | both | Opt out of the default case-insensitive match — useful for a path pattern that should not also match `FOO.KEY`. |
+
+Two properties to preserve when adding a flag:
+
+- **Fail protective.** Every probe is best-effort. No git, no manifest, an unparseable command, a detached HEAD — the rule must fall back to behaving as a plain pattern match (or stay silent, for a rule that *adds* blocking). It must never quietly drop an existing safety rule.
+- **Never raise.** The engine allows the action on any internal error. A guardrail that crashes the hook would block every tool call in the workspace.
+
+Frontmatter parsing is deliberately minimal: scalars and inline lists (`[a, b]`) only. A regex containing a comma cannot go in a list value — use a single scalar pattern instead.
+
+`file` rules see the edited path; add `match: content` to test the edited text instead. Note the engine is registered for `Bash|Edit|Write|MultiEdit`, so a rule cannot intercept a `Read` — a rule body promising "never read this" is documenting intent for the model, not enforcing it.
 
 ## Add an agent role
 
