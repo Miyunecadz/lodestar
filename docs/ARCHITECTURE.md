@@ -125,7 +125,7 @@ present a multi-select menu (recommended pre-checked) →
 write only the chosen entries → record them in the manifest
 ```
 
-- **Catalog** = the reusable, publishable asset. A folder of *templates* (guardrails, agents, skills), each tagged with metadata (`stacks`, `category`, `severity`, `recommended`, …). Forking Lodestar = editing the catalog. This is a lightweight, in-repo "marketplace." The catalog is a **universal core** (`stacks: [all]`) plus **stack packs** that activate only when detected — it ships a Node·GraphQL·React·React Native pack and a Python·Django pack. See `kit/catalog/CATALOG.md`.
+- **Catalog** = the reusable, publishable asset. A folder of *templates* (guardrails, agents, skills), each tagged with metadata (`stacks`, `category`, `severity`, `recommended`, …). Forking Lodestar = editing the catalog. This is a lightweight, in-repo "marketplace." The catalog is a **universal core** (`stacks: [all]`) plus **stack packs** that activate only when detected — it ships Node·GraphQL·React·React Native, Python·Django, Laravel·PHP, and Next.js packs. See `kit/catalog/CATALOG.md`.
 - **Picker** = the command. Generic. It reads the catalog, detects stacks, and drives an `AskUserQuestion` multi-select (Claude Code's native selectable menu). Recommended entries are pre-checked; the menu only shows entries that apply to the detected stacks — so it feels curated, not a wall of toggles.
 - **Manifest** = `.claude/lodestar.manifest.json`. Records the workspace, detected repos/stacks, and which guardrails/agents/skills are enabled. It is your **lockfile**: commit or share it, and `re-apply` reproduces the exact setup elsewhere. Each repo also carries its `architecture` (`graphify`/`markdown`/`deferred`), its `docs` path, and a `mapping` freshness fingerprint (`lastMappedSha`/`lastMappedAt`); an optional top-level `freshness` key records what `/lodestar-freshness` installed (hook manager, which repos are lockstep vs drift-checked, merge driver).
 
@@ -222,6 +222,7 @@ Choices made during design, with the reasoning, so forks can revisit them delibe
 - **v0.7 (unreleased)** — bootstrap installer (no persistent clone), remote + tag-pinned updates via `.lodestar/source.json`, `/lodestar-update <version>` rollback (issue #9).
 - **v0.8 (unreleased)** — enforcement surfaces (`agent`/`commit`/`both`) and a generated pre-commit checker, so safety rules hold for every committer (issue #3).
 - **v0.9 (unreleased)** — full build at onboard time plus a graph completeness assertion and `mapping.coverage` in the manifest (issue #5).
+- **v0.10 (unreleased)** — Laravel·PHP and Next.js catalog packs; a detected catalog gap now generates a workspace `docs/EXTENDING.md` and is reported, not buried in the manifest (issue #4).
 - **Later** — a skills picker (same engine); a `re-apply <manifest>` command; a lint-router settings hook generator; optional MCP picker; a `commit-msg` surface for message style and a `pre-push` surface for force-push.
 
 See [`CONCEPTS.md`](CONCEPTS.md) for the mental models and [`EXTENDING.md`](EXTENDING.md) to add your own catalog entries.

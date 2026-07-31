@@ -107,9 +107,15 @@ Guardrail for yourself: if a new role's body starts duplicating a skill, stop �
 ## Add a stack detector
 
 To support a new stack:
-1. Add a detection signal to `/lodestar-onboard` (e.g. "`Cargo.toml` present → `rust`").
+1. Add a detection signal to `/lodestar-onboard` §2 (e.g. "`Cargo.toml` present → `rust`").
 2. Tag relevant catalog entries with the new stack.
 3. That's it — the pickers intersect detected stacks with entry `stacks` automatically.
+
+A tag with no entries behind it is worse than no tag: the repo matches nothing and gets the universal core silently. So onboarding treats "detected a stack, matched no pack" as a reportable gap — it writes the unmatched tags into the manifest as `catalogGaps`, generates a workspace `docs/EXTENDING.md` from `kit/templates/docs/extending-gap.md`, and says so in its summary. If you add a detector, add at least a conventions skill with it.
+
+### What a pack looks like
+
+The Laravel pack is a good shape to copy — three guardrails (migrations that already ran, framework-generated paths, the formatter), three narrow agents (endpoint / migration / test writer), one conventions skill. Keep every piece **thin**: the skill points at `docs/REPO/`, and the agents point at the skill. A pack that restates framework documentation goes stale and burns context; a pack that names the repo's own conventions doc does not.
 
 ## Add a stack pack
 

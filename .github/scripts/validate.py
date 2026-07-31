@@ -89,6 +89,40 @@ def check_skills():
                 errors.append(f"{rel}: missing frontmatter key '{key}'")
 
 
+def check_catalog_totals():
+    """The CATALOG.md totals line is documentation that silently goes stale — count the
+    files and make CI notice when it disagrees."""
+    path = os.path.join(ROOT, "kit/catalog/CATALOG.md")
+    if not os.path.exists(path):
+        errors.append("kit/catalog/CATALOG.md is missing")
+        return
+    entries = (glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))
+               + glob.glob(os.path.join(ROOT, "kit/catalog/agents/*.md"))
+               + glob.glob(os.path.join(ROOT, "kit/catalog/skills/*/SKILL.md")))
+    text = open(path).read()
+    m = re.search(r"Totals:\s*\*\*(\d+) entries\*\*", text)
+    if not m:
+        errors.append("kit/catalog/CATALOG.md: no 'Totals: **N entries**' line to check")
+        return
+    claimed, actual = int(m.group(1)), len(entries)
+    if claimed != actual:
+        errors.append(f"kit/catalog/CATALOG.md claims {claimed} entries, found {actual}")
+
+
+def check_catalog_listed():
+    """Every catalog entry should appear in CATALOG.md — an unlisted pack is invisible."""
+    text = open(os.path.join(ROOT, "kit/catalog/CATALOG.md")).read()
+    for pattern in ("kit/catalog/guardrails/*.md", "kit/catalog/agents/*.md"):
+        for path in sorted(glob.glob(os.path.join(ROOT, pattern))):
+            entry_id = os.path.basename(path)[:-3]
+            if f"`{entry_id}`" not in text:
+                errors.append(f"kit/catalog/CATALOG.md does not list '{entry_id}'")
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/skills/*/SKILL.md"))):
+        name = os.path.basename(os.path.dirname(path))
+        if f"`{name}`" not in text:
+            errors.append(f"kit/catalog/CATALOG.md does not list skill '{name}'")
+
+
 def check_version():
     vpath = os.path.join(ROOT, "VERSION")
     cpath = os.path.join(ROOT, "CHANGELOG.md")
@@ -109,6 +143,8 @@ def main():
     check_guardrails()
     check_agents()
     check_skills()
+    check_catalog_totals()
+    check_catalog_listed()
     check_version()
     if errors:
         print("❌ validation failed:")

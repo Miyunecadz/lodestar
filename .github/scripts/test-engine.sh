@@ -16,7 +16,7 @@ cat > "$WORK/.claude/guardrails/block-env-files.md" <<'EOF'
 name: block-env-files
 enabled: true
 event: file
-pattern: '(^|/)\.env(\.(?!example)[^/]+)?$'
+pattern: '(^|/)\.env(?!.*\.(example|sample|template|dist|defaults)$)(\.[^/]+)?$'
 severity: block
 ---
 Never edit real .env files.
@@ -91,6 +91,8 @@ expect() {  # expect "<label>" "<want>" "<json>"
 # --- baseline behaviour (unchanged by the context layer) ---
 expect ".env deny"          DENY  '{"tool_name":"Edit","tool_input":{"file_path":"api/.env"}}'
 expect ".env.example allow" ALLOW '{"tool_name":"Edit","tool_input":{"file_path":"api/.env.example"}}'
+expect ".env.local.example allow" ALLOW '{"tool_name":"Edit","tool_input":{"file_path":"api/.env.local.example"}}'
+expect ".env.staging deny"        DENY  '{"tool_name":"Edit","tool_input":{"file_path":"api/.env.staging"}}'
 expect "rm -rf deny"        DENY  '{"tool_name":"Bash","tool_input":{"command":"rm -rf build"}}'
 expect "git commit warn"    WARN  '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}'
 expect "ls allow"           ALLOW '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}'
