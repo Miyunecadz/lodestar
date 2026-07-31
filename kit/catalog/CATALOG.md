@@ -4,7 +4,7 @@ Lodestar's catalog is organized into a **universal core** that works on any stac
 
 > Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../../docs/EXTENDING.md`](../../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
 
-Totals: **39 entries** — 18 universal · 14 Node·GraphQL·RN · 7 Python·Django.
+Totals: **49 entries** — 18 universal · 14 Node·GraphQL·RN · 7 Python·Django · 7 Laravel·PHP · 3 Next.js.
 
 ---
 
@@ -67,6 +67,32 @@ Detected via `node-dbmate`, `graphql-apollo-server`, `graphql-apollo-client`, `r
 | skill | `frontend-standards` | `react-craco` |
 | skill | `mobile-standards` | `react-native` |
 
+## 🐘 Laravel · PHP pack
+
+Activates on `laravel` (an `artisan` file or `laravel/framework` in `composer.json`).
+
+| Kind | Entry | Purpose |
+|---|---|---|
+| guardrail | `block-edit-applied-migrations-laravel` | block edits to migrations that already ran (new ones stay writable) |
+| guardrail | `protect-laravel-generated` | block edits to `bootstrap/cache/`, `storage/framework/`, Vite/Mix output |
+| guardrail | `php-autolint-on-edit` | run Pint on the edited file (`has-pint`) |
+| agent | `laravel-endpoint-writer` | route + controller + FormRequest + API Resource + policy, contract updated |
+| agent | `eloquent-migration-writer` | new migration with a real `down()`, model updated to match |
+| agent | `test-writer-php` | Pest or PHPUnit, matching the repo's existing style |
+| skill | `laravel-backend-standards` | Eloquent, FormRequests, Resources, policies, `env()`-in-config, queues |
+
+## ▲ Next.js pack
+
+Activates on `nextjs` (`next` in deps or a `next.config.*` file).
+
+| Kind | Entry | Purpose |
+|---|---|---|
+| guardrail | `nextjs-no-public-secrets` | warn when a `NEXT_PUBLIC_` variable looks like a secret (it ships to the browser) |
+| agent | `nextjs-route-writer` | route or handler with a deliberate server/client boundary |
+| skill | `nextjs-frontend-standards` | App vs Pages Router, Server/Client Components, `NEXT_PUBLIC_`, data fetching |
+
+> Onboarding also records **which router** a Next.js repo uses (`app/` vs `pages/`) in its conventions doc — the two have different files and different data-fetching APIs, and an agent that guesses writes code that never runs.
+
 ## 🐍 Python · Django pack
 
 Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
@@ -94,9 +120,12 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 | `templates/docs/_shared/rest-api-contract.md` | REST/DRF seed for the spine (used only if a DRF stack is detected) |
 | `templates/docs/_shared/{env-matrix,auth-model,local-setup,glossary}.md` | cross-repo docs (stack-neutral) |
 | `templates/docs/repo-conventions.md` | per-repo conventions stub |
+| `templates/docs/extending-gap.md` | workspace `docs/EXTENDING.md`, generated when a stack has no catalog pack |
 | `templates/hooks/lodestar-guardrails.py` | the bundled guardrail engine (`/lodestar-guardrails` copies it to `.claude/hooks/`) |
 | `templates/hooks/lodestar-graph-refresh.sh` | graphify-mode **lockstep** pre-commit graph rebuild (`/lodestar-freshness`) |
 | `templates/hooks/lodestar-freshness-check.py` | offline drift detector for architecture maps (`/lodestar-freshness`, `/lodestar-refresh`) |
+| `templates/hooks/lodestar-precommit-check.py` | commit-surface guardrail enforcement for any committer (`/lodestar-guardrails`) |
+| `templates/hooks/lodestar-graph-coverage.py` | graph **completeness** assertion: on-disk code vs graph nodes (`/lodestar-onboard`, `/lodestar-refresh`) |
 | `templates/git/gitattributes-graphify` | union-merge `.gitattributes` for `graph.json` (`/lodestar-freshness`) |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 
