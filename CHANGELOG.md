@@ -2,6 +2,31 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.6.0] — Unreleased
+
+Guardrail engine pass — rules were stateless regex matchers, so several shipped rules over-blocked legitimate work or under-enforced what their names promised. The engine now computes a small context layer that rules opt into declaratively. Closes #11.
+
+### Added
+- **Context layer in the guardrail engine** (`kit/templates/hooks/lodestar-guardrails.py`) — lazy, stdlib-only, computed at most once per invocation and shared by every rule: **git** (tracked status, current vs default branch), **stack** (target path → onboarded repo → detected stacks, from the manifest), **shell** (the command split into quoted vs unquoted words). Every probe fails **protective**: no git, no manifest, or an unparseable command means a rule behaves exactly as it did before. The hook still never raises — any internal error allows the action.
+- **Rule context flags** — `stacks:` (now enforced), `allow_if_untracked`, `only_on_default_branch`, `match: argv`, `allow_paths`, `ignore_case`. Documented with the two invariants in `docs/EXTENDING.md`.
+- **`block-commit-to-default-branch`** — the branch-aware rule `protect-default-branch` could never be: blocks `git commit`/`git push` while HEAD is the repo's default branch, resolving the default from `origin/HEAD` → `init.defaultBranch` → an existing local `main`/`master`. Silent when the branch cannot be determined, so it never blocks work on a detached HEAD or outside git.
+- **Engine smoke test grew to 24 cases** (`.github/scripts/test-engine.sh`) — covers quoted-argument false positives, nested-shell payloads, unbalanced quotes, the temp-path allow-list, tracked vs untracked vs unborn migrations, default vs feature branch, and per-repo stack scoping in a mixed workspace.
+
+### Fixed
+- **`stacks:` is enforced at match time.** `load_rules` filtered only on `enabled` and `event`, so a rule scoped to one stack fired in **every** repo of a workspace — `mobile-use-patch-package` (`stacks: [react-native]`) denied `node_modules` edits in plain Node and CRA repos, where its "run `npx patch-package`" advice is wrong. The engine now resolves the target path to its onboarded repo and skips a rule whose `stacks` don't intersect. A path outside every repo still matches, so nothing is silently dropped.
+- **`block-edit-applied-migrations` no longer blocks the migration it tells you to create.** The rule matched every write under `db/migrations/`, including the empty skeleton `dbmate new` had just scaffolded — making its own redirect impossible to follow. With `allow_if_untracked: true` it fires only for migrations git already tracks (tracked standing in for "applied", which is not detectable offline). Same fix for the Django variant.
+- **`block-destructive-commands` no longer fires on text that deletes nothing.** It matched the raw command string, so `rm -rf` inside a quoted JSON argument or an echoed warning was blocked. `match: argv` tests unquoted words only, while payloads handed to a nested shell (`bash -c "…"`, `eval "…"`) are still matched so quoting is not a bypass; `allow_paths` exempts deletes whose every operand is an absolute path under `/tmp`, `/var/tmp`, or `/var/folders`. Relative operands and compound commands never qualify for the exemption.
+- **Frontmatter parser handles inline lists.** `stacks: [react-native]` parsed as the string `"[react-native]"`, which is why rule metadata could not express scoping at all.
+- **The three `git commit` rules are anchored to real invocations.** `scan-secrets-before-commit`, `verifier-before-commit`, and `commit-message-style` all keyed on the bare substring `git commit`, matching it inside quoted strings and unrelated compound commands. All three now use a command-boundary pattern with `match: argv`, and each body states plainly that a `PreToolUse` hook cannot confirm the step it asks for ran — they are checklist prompts, not gates.
+
+### Changed
+- **`protect-default-branch` retitled to "Block bare force-push to any branch"** — it is force-push-only and always was; the body now says so and points at `block-commit-to-default-branch` for the branch-aware half. The id is unchanged, so existing installs keep working.
+- **`/lodestar-guardrails` copies the context flags** when installing a rule into `.claude/guardrails/` — a rule installed without its `stacks`/flags silently loses its scoping.
+
+### Upgrading
+
+`/lodestar-update` refreshes the **engine**, but your enabled rules in `.claude/guardrails/` are generated content and are deliberately left untouched. They keep working as-is (a rule with no context flags behaves exactly as before), so **re-run `/lodestar-guardrails`** to adopt the corrected rules and pick up `block-commit-to-default-branch`.
+
 ## [0.5.0] — Unreleased
 
 Repo layout pass — separate what Lodestar *ships* from how this repo is *built*. Purely structural: the installed workspace is byte-identical to 0.4.0.

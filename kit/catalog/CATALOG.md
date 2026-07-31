@@ -1,10 +1,10 @@
 # Catalog Index — Universal Core & Stack Packs
 
-Lodestar's catalog is organized into a **universal core** that works on any stack, plus **stack packs** whose entries activate only when a matching stack is detected. The `stacks:` field on each entry is what the pickers filter on — an entry never appears (or fires) on a workspace whose stacks don't match.
+Lodestar's catalog is organized into a **universal core** that works on any stack, plus **stack packs** whose entries activate only when a matching stack is detected. The `stacks:` field on each entry is what the pickers filter on — an entry never appears on a workspace whose stacks don't match, and the guardrail engine re-checks `stacks` at match time so a pack rule cannot fire in the wrong repo of a mixed workspace.
 
 > Adopting Lodestar on a new stack? You get the **universal core** immediately. Then either add a stack pack below (if one fits) or author your own — see [`../../docs/EXTENDING.md`](../../docs/EXTENDING.md). Packs compose: a Django API behind a React admin panel uses the **Python·Django** and **Node·GraphQL·RN** packs side by side.
 
-Totals: **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Django.
+Totals: **39 entries** — 18 universal · 14 Node·GraphQL·RN · 7 Python·Django.
 
 ---
 
@@ -13,7 +13,8 @@ Totals: **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Dja
 | Kind | Entry | Purpose |
 |---|---|---|
 | guardrail | `block-destructive-commands` | block irreversible shell commands (`rm -rf`, `reset --hard`, `DROP …`) |
-| guardrail | `protect-default-branch` | block `git push --force` to a shared branch |
+| guardrail | `protect-default-branch` | block bare `git push --force` on any branch |
+| guardrail | `block-commit-to-default-branch` | block committing/pushing while on trunk (branch-aware) |
 | guardrail | `block-env-files` | block reading/writing real `.env*` files (secrets) |
 | guardrail | `block-secret-files` | block reading/writing private keys & credential files |
 | guardrail | `scan-secrets-before-commit` | remind to scan the staged diff for hardcoded secrets |
