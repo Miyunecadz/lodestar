@@ -2,6 +2,30 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.10.0] — Unreleased
+
+Catalog-coverage pass — onboarding a Laravel/PHP + Next.js monorepo produced **zero** stack-specific entries for either repo, two of the most common web stacks, and the gap was recorded only as a string in the manifest. Closes #4.
+
+### Added
+- **Laravel · PHP pack** (7 entries) — `laravel-endpoint-writer` (route + controller + FormRequest + API Resource + policy, contract updated), `eloquent-migration-writer` (new migration with a real `down()`, model updated to match), `test-writer-php` (Pest or PHPUnit, matching the repo's existing style rather than introducing a second one), `laravel-backend-standards` skill, plus guardrails: `block-edit-applied-migrations-laravel` (blocks migrations git already tracks, leaves a freshly scaffolded one writable, enforced on the **commit** surface too), `protect-laravel-generated` (`bootstrap/cache/`, `storage/framework/`, Vite/Mix output), and `php-autolint-on-edit` (Pint, scoped to `has-pint`).
+- **Next.js pack** (3 entries) — `nextjs-route-writer` (deliberate server/client boundary), `nextjs-frontend-standards` skill, and `nextjs-no-public-secrets`, a content-matching guardrail that warns when a `NEXT_PUBLIC_` variable looks like a secret. Every `NEXT_PUBLIC_` value is inlined into the client bundle, so prefixing a secret publishes it; it **warns** rather than blocks because the name alone cannot distinguish a Stripe publishable key from a secret one.
+- **Stack detectors** — `laravel` (`artisan` / `laravel/framework`), `php` (`composer.json`), `nextjs` (`next` dep or `next.config.*`), `has-pint`, `has-pest`. Onboarding also records **which router** a Next.js repo uses (`app/` vs `pages/`): the file conventions and data-fetching APIs differ, and an agent that guesses writes code that silently never runs.
+- **A detected gap now produces a document, not a manifest string.** New `kit/templates/docs/extending-gap.md` → generated as the workspace's `docs/EXTENDING.md` when a repo's stacks match no catalog entry, naming the unmatched tags, what the repo got instead (universal core only), and how to add a pack — upstream (preferred) or locally, with the trade-off that `/lodestar-update` refreshes `.lodestar/catalog/`. Appends per repo rather than overwriting. Onboarding also states the gap in its summary and records `catalogGaps.unmatchedStacks` + the doc path in the manifest.
+- **Two validator checks** — CI now fails when `CATALOG.md`'s `Totals: **N entries**` line disagrees with the files on disk, or when any guardrail/agent/skill is missing from the listing. Both were verified to fail on deliberate drift; a pack nobody can find in the index is a pack nobody adopts.
+
+### Fixed
+- **`block-env-files` blocked per-tier templates.** Its lookahead only excused a bare `.env.example`, so `.env.local.example` / `.env.staging.sample` — committed templates that exist precisely so nobody needs the real file — were treated as live secrets. The lookahead now checks the end of the name. Found while probing the new Next.js rule, whose test case was being masked by this. Real `.env.local` / `.env.production` are still blocked; the engine suite now uses the catalog's actual pattern instead of a simplified copy, so this cannot regress unnoticed.
+- **`autolint-on-edit` only matched `src/`.** Next.js App Router routes live in `app/`, Pages Router in `pages/`, and plenty of repos keep `components/`, `lib/`, or `hooks/` at the top level — all silently skipped. The pattern now covers those roots.
+
+### Notes on scope
+- **The issue's second half was already stale.** It says "the promised `docs/EXTENDING.md` was never generated", but the kit has shipped `docs/EXTENDING.md` as a contributor guide since before this work. The real gap was that a *workspace* had nothing — so the fix generates a workspace-local `docs/EXTENDING.md` about that workspace's unmatched stacks, and points at the kit guide for the mechanics. Two files, two audiences; the kit's guide is stack-agnostic and ships to everyone, so writing detected gaps into it would have been wrong.
+- **Packs are deliberately thin.** Three guardrails, three narrow agents, one conventions skill for Laravel; the skill points at `docs/REPO/` and the agents point at the skill. Restating framework documentation in a catalog entry goes stale and burns context on every load — the pack's job is to encode *where things go in this repo* and *what must not happen*, not to teach the framework.
+- **Not scaffolding stub packs** (item 3 of the issue, marked optional). A generated stub agent is an unversioned file in `.claude/` that looks official, and `/lodestar-update` will not maintain it. The generated `EXTENDING.md` steers to authoring a catalog entry instead, which is the shareable path. Happy to add scaffolding if you'd rather have it.
+
+### Upgrading
+
+Re-run `/lodestar-onboard ./<repo>` on a Laravel or Next.js repo to pick up the new detectors and skills, then `/lodestar-guardrails` and `/lodestar-agents` to tick the new entries. Existing repos are unaffected until you do.
+
 ## [0.9.0] — Unreleased
 
 Graph-completeness pass — a map can be *born* incomplete, and nothing checked. Node counts were never compared against the source tree, so a graph missing whole files looked identical to a complete one. Because `CLAUDE.md` tells agents to prefer querying the graph over re-reading source, that misleads an agent exactly like a stale map does. Closes #5.

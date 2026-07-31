@@ -119,7 +119,7 @@ bash install.sh ~/code/my-workspace --ref v0.6.0     # any release from v0.5.0 o
 
 - Not a monorepo tool — your repos stay independent, with their own git history and CI.
 - Not a replacement for Claude Code features — it's a disciplined way to *arrange* them (skills, hooks, agents, MCP scopes).
-- Not opinionated about your stack — the catalog is a **universal core** (works anywhere) plus **stack packs** that activate only when detected. It ships a **Node·GraphQL·React·React Native** pack and a **Python·Django** pack; every entry is stack-tagged and easy to swap or extend. See [`kit/catalog/CATALOG.md`](kit/catalog/CATALOG.md).
+- Not opinionated about your stack — the catalog is a **universal core** (works anywhere) plus **stack packs** that activate only when detected. It ships **Node·GraphQL·React·React Native**, **Python·Django**, **Laravel·PHP**, and **Next.js** packs; every entry is stack-tagged and easy to swap or extend. When a repo's stack has *no* pack, onboarding says so and generates a `docs/EXTENDING.md` describing how to add one, rather than quietly falling back to the universal core. See [`kit/catalog/CATALOG.md`](kit/catalog/CATALOG.md).
 
 ## Documentation
 

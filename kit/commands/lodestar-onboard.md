@@ -24,6 +24,11 @@ Classify the repo using these signals (collect ALL that match):
 | `.husky/` present | `has-husky` |
 | eslint config or dep | `has-eslint` |
 | `bull` / `ioredis` in deps | `redis-queue` |
+| `artisan` present, or `laravel/framework` in `composer.json` | `laravel` |
+| `composer.json` present | `php` |
+| `laravel/pint` in deps or `pint.json` present | `has-pint` |
+| `pest` / `pestphp/pest` in deps or `Pest.php` in `tests/` | `has-pest` |
+| `next` in deps or a `next.config.*` file | `nextjs` |
 | `manage.py` present | `python-django` |
 | `requirements.txt` / `pyproject.toml` / `Pipfile` | `python` |
 | `djangorestframework` in deps | `drf` |
@@ -34,6 +39,8 @@ Classify the repo using these signals (collect ALL that match):
 | prettier config or dep | `has-prettier` |
 | a UI framework present (`react`, `react-native`, `vue`, `svelte`, `@angular/core`) or a components/`.jsx`/`.tsx`/`.vue` tree | `has-frontend` |
 | an auth library present (`jsonwebtoken`, `passport`, `next-auth`, `bcrypt`, `django.contrib.auth`, `djangorestframework-simplejwt`, `devise`, `omniauth`) | `has-auth` |
+
+For a `nextjs` repo also note **which router** it uses — an `app/` directory (App Router) or `pages/` (Pages Router), or both mid-migration. Record it in the repo's `conventions.md`: the file conventions and data-fetching APIs differ, and an agent that guesses writes code that silently never runs.
 
 Report the detected tags. Tags fall into two kinds: **stack tags** (the ecosystem — `python-django`, `react-native`) and **capability tags** (a tool is configured — `has-eslint`, `has-gitleaks`). Both feed the pickers identically; capability tags are how a rule adapts to "this repo already uses X." (Extend this table for new stacks/capabilities as needed — see `docs/EXTENDING.md`.)
 
@@ -103,6 +110,16 @@ For each stack-scoped skill in `.lodestar/catalog/skills/` whose `stacks` inters
 - REST/DRF (`drf`) → seed from `.lodestar/templates/docs/_shared/rest-api-contract.md`.
 Keep the filename `api-contract.md` either way — the cross-links in the other shared docs point at it. If no API-style stack is detected, leave the generic stub as-is and say nothing about GraphQL/REST.
 
+## 5c. Surface any catalog gap (don't bury it in the manifest)
+
+If **no stack-scoped** skill, agent, or guardrail matched this repo's stacks, the repo got only the universal core. That is a real outcome the user should see, not a string in a JSON file — a detected-but-unwritten gap is invisible.
+
+1. Record it in the manifest as `catalogGaps` (below), naming the unmatched stack tags.
+2. **Generate `docs/EXTENDING.md` in the workspace** from `.lodestar/templates/docs/extending-gap.md`, filling in the unmatched stacks, the repo they came from, and today's date. If the file already exists, append a new section for this repo rather than overwriting — several repos can each contribute a gap. This is the workspace's own "here's what's missing and how to add it" doc; it points at the kit's contributor guide for the mechanics.
+3. **Say it in the report** (§7): which stacks had no pack, what the repo got instead (universal core only), and that `docs/EXTENDING.md` now describes how to add one.
+
+Do not invent catalog entries to fill the gap on the spot — an ad-hoc agent written into a workspace is unversioned and unshared. Authoring a catalog entry is the supported path.
+
 ## 6. Update the map and manifest
 - Append the repo + its detected stacks to `docs/repo-map.md`.
 - Add to `.claude/lodestar.manifest.json` under `repos`:
@@ -124,7 +141,11 @@ Keep the filename `api-contract.md` either way — the cross-links in the other 
     }
   }
   ```
+  When §5c found a gap, also set `catalogGaps` on the repo entry:
+  ```json
+  "catalogGaps": { "unmatchedStacks": ["laravel", "nextjs"], "doc": "docs/EXTENDING.md" }
+  ```
   Include `mapping` only when a map was actually produced (omit it for a **deferred** architecture). `coverage` comes from §3b (graphify repos only) — recording it makes incompleteness as visible as drift, and lets a later run see whether coverage regressed. `build: full` records that the baseline was a full extraction. Merge any newly installed skills into `skills`.
 
 ## 7. Report
-Summarize: stacks detected, graph status **including coverage** (`N/M code files covered`, and the count of any missing files — say plainly if the graph is incomplete and which files an agent therefore cannot see), docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`), delegation (`/lodestar-agents`), and **map freshness** (`/lodestar-freshness` — keeps the architecture map in sync with the code so a stale graph never misleads an agent) are separate opt-in commands they can now run, since the stacks and architecture are known.
+Summarize: stacks detected (naming any with **no catalog pack**, per §5c), graph status **including coverage** (`N/M code files covered`, and the count of any missing files — say plainly if the graph is incomplete and which files an agent therefore cannot see), docs created, skills installed. Remind the user that enforcement (`/lodestar-guardrails`), delegation (`/lodestar-agents`), and **map freshness** (`/lodestar-freshness` — keeps the architecture map in sync with the code so a stale graph never misleads an agent) are separate opt-in commands they can now run, since the stacks and architecture are known.
