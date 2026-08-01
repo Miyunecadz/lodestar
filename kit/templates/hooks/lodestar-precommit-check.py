@@ -27,6 +27,10 @@ Exit status: 1 only when a `block` rule matched. Everything else — a `warn` ma
 rules, a missing tool, an unreadable manifest, an internal error — exits 0. A guardrail
 that breaks unrelated commits would be worse than the gap it closes; `git commit
 --no-verify` (or `LEFTHOOK=0`) remains the documented escape hatch.
+
+Requires Python 3.8+ (see MIN_PYTHON), stdlib only. Failing open is the right default
+here, but it must be *visible*: an interpreter under the floor says so rather than
+letting the commit through under a generic "skipped".
 """
 
 import json
@@ -36,6 +40,10 @@ import subprocess
 import sys
 
 GIT_TIMEOUT = 10  # generous: gitleaks on a large staged diff
+
+# Kept in step with lodestar-guardrails.py — the two hooks share a rule set, so a floor
+# that differed between them would mean a rule enforcing on one surface and not the other.
+MIN_PYTHON = (3, 8)
 
 # Conservative fallback patterns, used only when no real scanner is installed. Kept
 # narrow on purpose — a false positive here interrupts someone else's commit.
@@ -377,7 +385,16 @@ def main(argv):
 
 if __name__ == "__main__":
     try:
+        if sys.version_info < MIN_PYTHON:
+            print(
+                "⛔ LODESTAR COMMIT GUARDRAILS ARE NOT ENFORCING — this hook needs "
+                "Python %d.%d+ but `python3` is %s.\n"
+                "Every `commit` rule in .claude/guardrails/ is inert, including `block` "
+                "rules. This commit was NOT checked."
+                % (MIN_PYTHON[0], MIN_PYTHON[1], "%d.%d.%d" % sys.version_info[:3])
+            )
+            sys.exit(0)
         sys.exit(main(sys.argv[1:]))
     except Exception as exc:  # never break a commit over a bug in here
-        print(f"lodestar-precommit-check: skipped ({exc})")
+        print(f"lodestar-precommit-check: skipped, commit NOT checked ({exc})")
         sys.exit(0)

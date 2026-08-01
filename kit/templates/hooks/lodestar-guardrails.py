@@ -46,10 +46,15 @@ the permission surface existed nothing declared a non-agent surface, so this eng
 ignored the field entirely and ran every rule it found.
 
 Design notes:
-- stdlib only; never raises out of the hook — on any error it allows the action (exit 0).
+- Python 3.8+, stdlib only. See MIN_PYTHON below — an interpreter under the floor is
+  reported loudly rather than silently allowing everything.
+- Never raises out of the hook — on any error it allows the action (exit 0).
 - Every context probe is best-effort and fails **protective**: when the engine cannot
   determine something (no git, no manifest, unparseable command), it behaves as it did
   before the context layer rather than silently dropping a rule.
+- Failing protective is scoped to *one rule*. A failure that takes out the **whole rule
+  set** is a different animal — it turns fail-protective into fail-open for everything —
+  so it is reported as NOT ENFORCING rather than as a one-line error. See RuleSetError.
 - File rules match the PATH (`file_path`), which is what Lodestar's file guardrails target.
   A rule may set `match: content` to test the edited text instead.
 - Block wins over warn; all matching messages are combined.
@@ -64,6 +69,30 @@ import shlex
 import subprocess
 
 GIT_TIMEOUT = 2  # seconds; a hook must never hang a tool call
+
+# The oldest interpreter this hook is tested against. 3.8 is what Ubuntu 20.04 LTS and
+# RHEL 8 ship as `python3`, and CI runs the engine suite against it. Raising this floor
+# means raising it in README.md, docs/EXTENDING.md and the CI matrix too.
+MIN_PYTHON = (3, 8)
+
+
+class RuleSetError(Exception):
+    """The rule set as a whole could not be loaded.
+
+    Distinct from a single rule failing: one bad rule file is skipped and the rest still
+    enforce, but if nothing loads then *no* guardrail is enforcing and the user must be
+    told in terms they cannot miss in a busy session.
+    """
+
+
+def not_enforcing(detail: str) -> str:
+    """The one message that must never look like a routine warning."""
+    return (
+        "⛔ LODESTAR GUARDRAILS ARE NOT ENFORCING — "
+        + detail
+        + ".\nEvery rule in `.claude/guardrails/` is inert for this action, including "
+        "`block` rules. Treat this workspace as having no guardrails until it is fixed."
+    )
 
 
 def rules_dir() -> str:
@@ -363,23 +392,39 @@ class Context:
 
 
 def load_rules(event: str):
-    out = []
-    for path in glob.glob(os.path.join(rules_dir(), "*.md")):
+    """Rules applying to `event`.
+
+    One unreadable or malformed rule file is skipped so the rest keep enforcing. But if
+    rule files exist and *every one* of them fails, that is not "no rules to apply" — it
+    is a systematic failure (an interpreter under MIN_PYTHON, an unreadable directory, a
+    regression in the parser) wearing the same costume. Raise instead, so main() can say
+    so out loud rather than returning an empty list that reads as "all clear".
+    """
+    out, seen, failed = [], 0, 0
+    try:
+        paths = glob.glob(os.path.join(rules_dir(), "*.md"))
+    except Exception as e:
+        raise RuleSetError("cannot read %s (%s)" % (rules_dir(), e))
+    for path in paths:
+        seen += 1
         try:
             with open(path, "r") as f:
                 fm, body = parse_frontmatter(f.read())
-        except (IOError, OSError, UnicodeDecodeError):
+            if not fm or fm.get("enabled") is False:
+                continue
+            if "agent" not in surfaces_of(fm):
+                continue  # enforced elsewhere (commit hook, permissions.deny) — not here
+            rule_event = fm.get("event", "all")
+            if rule_event not in ("all", event):
+                continue
+            if not fm.get("pattern"):
+                continue
+            out.append(dict(fm, _message=body))
+        except Exception:
+            failed += 1  # a broken rule must never take the rest of the set down
             continue
-        if not fm or fm.get("enabled") is False:
-            continue
-        if "agent" not in surfaces_of(fm):
-            continue  # enforced elsewhere (commit hook, permissions.deny) — not here
-        rule_event = fm.get("event", "all")
-        if rule_event not in ("all", event):
-            continue
-        if not fm.get("pattern"):
-            continue
-        out.append(fm | {"_message": body})
+    if seen and failed == seen:
+        raise RuleSetError("all %d rule file(s) in %s failed to load" % (seen, rules_dir()))
     return out
 
 
@@ -479,8 +524,14 @@ def main():
     scope = scope_for(event, tool_input)
     command = tool_input.get("command", "") if event == "bash" else ""
 
+    try:
+        rules = load_rules(event)
+    except RuleSetError as e:
+        print(json.dumps({"systemMessage": not_enforcing(str(e))}))
+        return
+
     blocking, warning = [], []
-    for rule in load_rules(event):
+    for rule in rules:
         target = field_for(rule, event, tool_input)
         if not target:
             continue
@@ -512,9 +563,22 @@ def main():
 
 if __name__ == "__main__":
     try:
+        if sys.version_info < MIN_PYTHON:
+            # Checked before anything else runs: on an interpreter under the floor the
+            # engine may raise somewhere arbitrary, and the message it produced then was
+            # a bare TypeError easily mistaken for a one-off glitch.
+            raise RuleSetError(
+                "this hook needs Python %d.%d+ but `python3` is %s"
+                % (MIN_PYTHON[0], MIN_PYTHON[1], "%d.%d.%d" % sys.version_info[:3])
+            )
         main()
+    except RuleSetError as e:
+        print(json.dumps({"systemMessage": not_enforcing(str(e))}))
     except Exception as e:
-        # Never let a hook error block the user's action.
-        print(json.dumps({"systemMessage": f"lodestar-guardrails error: {e}"}))
+        # Never let a hook error block the user's action — but say plainly that the
+        # action went unchecked, since exiting without a decision allows it.
+        print(json.dumps({"systemMessage": not_enforcing(
+            "lodestar-guardrails crashed before it could check this action (%s)" % e
+        )}))
     finally:
         sys.exit(0)

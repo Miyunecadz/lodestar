@@ -2,6 +2,28 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.14.0] — Unreleased
+
+The guardrail engine required Python 3.9+ without saying so, and on 3.8 it did not fail — it *allowed*. A dict-union expression in `load_rules` raised for every rule file, the outer handler caught it, and the hook exited 0 with no `permissionDecision`. Every rule in the workspace, `block` rules included, was inert behind one line of `systemMessage` that is easy to miss in a busy session. Ubuntu 20.04 LTS and RHEL 8 ship 3.8 as `python3`. Closes #29.
+
+The one-line fix is the smallest part of this. The failure was invisible because the engine could not distinguish *one rule failing* from *the whole rule set failing* — the first is a proportionate degradation, the second means there are no guardrails at all — and because CI ran one interpreter, so no test could see it.
+
+### Fixed
+- **`fm | {"_message": body}` → `dict(fm, _message=body)`** in `lodestar-guardrails.py`. The dict-union operator is Python 3.9+ (PEP 584); this is the only 3.9+ construct in any shipped hook.
+- **A rule set that fails to load no longer reads as a clean pass.** `load_rules` now raises `RuleSetError` when rule files exist and *every one* of them fails, rather than returning an empty list. An empty rules directory is still a legitimate `{}` — nothing to enforce is not a failure.
+
+### Added
+- **`MIN_PYTHON = (3, 8)`** declared in both enforcement hooks, checked before anything else runs.
+- **An unmistakable not-enforcing message.** `⛔ LODESTAR GUARDRAILS ARE NOT ENFORCING` — emitted for an interpreter under the floor, a rule set where nothing loads, and a crash that reaches the outer handler. It says the action went unchecked and that `block` rules are inert, instead of the previous bare `lodestar-guardrails error: <exception>`. The pre-commit checker prints the equivalent and still exits 0, because it must never break someone else's commit.
+- **A CI Python matrix** (`python-floor` job, checks `python 3.8` and `python 3.x`) running the two enforcement suites against the declared floor and the current release. Added to the required status checks in `.github/rulesets/protect-main.json` — **re-run `.github/rulesets/apply.sh` to make them gate merges.**
+- **`LODESTAR_TEST_PYTHON`** in `test-engine.sh` and `test-precommit.sh`, so the floor can be exercised locally with any interpreter.
+- **Engine test cases** for the three states that used to look alike: a rule set where nothing loads reports not-enforcing, one broken rule does not disable the rest, and no rules at all is a plain allow. Plus an assertion that every shipped hook *parses* at `MIN_PYTHON`, which catches 3.9+ syntax on a modern box the way the matrix catches runtime-only constructs like this one.
+
+### Changed
+- **README Requirements** states Python **3.8+** rather than "Python 3".
+- **`docs/EXTENDING.md`** gains a "one rule failing vs. the whole rule set failing" section next to the never-raise invariant, and documents the floor and how to raise it.
+- **`docs/CI.md`** describes the new job and why a single-interpreter CI could not catch this class of bug.
+
 ## [0.13.0] — Unreleased
 
 `block-env-files` and `block-secret-files` are titled "block **reads** and writes". They did not block reads. The PreToolUse engine is registered for `Bash|Edit|Write|MultiEdit`, so a `Read` never reached it — the strongest-worded rules in the catalog were, on their headline claim, advisory. Closes #23.

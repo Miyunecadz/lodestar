@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Smoke-test the commit-surface guardrail checker against a real git repo with staged
 # changes. Exit 1 means "commit blocked"; everything else must exit 0.
+#
+# Set LODESTAR_TEST_PYTHON to run the suite under another interpreter — CI uses it to
+# cover the floor declared as MIN_PYTHON in the checker.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CHECK="$ROOT/kit/templates/hooks/lodestar-precommit-check.py"
+PY="${LODESTAR_TEST_PYTHON:-python3}"
 
-python3 -c "import py_compile; py_compile.compile('$CHECK', doraise=True)" && echo "checker compiles"
+echo "interpreter under test: $("$PY" -V 2>&1)"
+"$PY" -c "import py_compile; py_compile.compile('$CHECK', doraise=True)" && echo "checker compiles"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -115,7 +120,7 @@ Enforced by permissions.deny, not by this hook.
 EOF
 
 pass=0; fail=0
-run_check() { (cd "${2:-$WS}" && LODESTAR_WORKSPACE="$WS" python3 "$CHECK" 2>&1); }
+run_check() { (cd "${2:-$WS}" && LODESTAR_WORKSPACE="$WS" "$PY" "$CHECK" 2>&1); }
 expect() {  # expect "<label>" "<want-exit>" [<cwd>]
   local label="$1" want="$2" cwd="${3:-$WS}" out rc
   set +e; out="$(run_check _ "$cwd")"; rc=$?; set -e
@@ -195,7 +200,7 @@ expect "in-stack path blocks" 1
 unstage
 
 # --- --list reports the commit-surface rule set -------------------------------------
-set +e; listed="$(cd "$WS" && LODESTAR_WORKSPACE="$WS" python3 "$CHECK" --list)"; set -e
+set +e; listed="$(cd "$WS" && LODESTAR_WORKSPACE="$WS" "$PY" "$CHECK" --list)"; set -e
 for want in block-env-files block-secret-files block-edit-applied-migrations scan-secrets-before-commit; do
   if printf '%s' "$listed" | grep -q "$want"; then echo "ok: --list has $want"; pass=$((pass+1))
   else echo "FAIL: --list missing $want"; fail=$((fail+1)); fi
@@ -225,7 +230,7 @@ mv "$WORK/rules-away" "$WS/.claude/guardrails"
 
 # outside any workspace → silent no-op
 mkdir -p "$WORK/elsewhere"; git init -q "$WORK/elsewhere"
-set +e; out="$(cd "$WORK/elsewhere" && env -u LODESTAR_WORKSPACE -u CLAUDE_PROJECT_DIR python3 "$CHECK"; echo "rc=$?")"; set -e
+set +e; out="$(cd "$WORK/elsewhere" && env -u LODESTAR_WORKSPACE -u CLAUDE_PROJECT_DIR "$PY" "$CHECK"; echo "rc=$?")"; set -e
 if [ "$out" = "rc=0" ]; then echo "ok: no workspace → silent exit 0"; pass=$((pass+1))
 else echo "FAIL: no workspace → '$out'"; fail=$((fail+1)); fi
 

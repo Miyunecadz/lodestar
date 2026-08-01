@@ -1,10 +1,38 @@
 #!/usr/bin/env bash
 # Smoke-test the guardrail engine end to end against a temp rule set.
+#
+# Set LODESTAR_TEST_PYTHON to run the whole suite under another interpreter. CI uses it
+# to run everything below against the declared floor (MIN_PYTHON in the engine), because
+# a version-floor break does not fail loudly — it makes every rule silently inert.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENGINE="$ROOT/kit/templates/hooks/lodestar-guardrails.py"
+PY="${LODESTAR_TEST_PYTHON:-python3}"
 
-python3 -c "import py_compile,sys; py_compile.compile('$ENGINE', doraise=True)" && echo "engine compiles"
+echo "interpreter under test: $("$PY" -V 2>&1)"
+"$PY" -c "import py_compile,sys; py_compile.compile('$ENGINE', doraise=True)" && echo "engine compiles"
+
+# Every shipped hook must PARSE at the floor, whatever interpreter is running this.
+# This catches 3.9+ syntax on a modern box; the CI floor job catches runtime-only
+# constructs like the dict-union operator, which parses everywhere but raises on 3.8.
+python3 - "$ROOT" <<'PYEOF'
+import ast, glob, os, re, sys
+root = sys.argv[1]
+engine = os.path.join(root, "kit/templates/hooks/lodestar-guardrails.py")
+m = re.search(r"^MIN_PYTHON = \((\d+), (\d+)\)", open(engine).read(), re.M)
+if not m:
+    sys.exit("MIN_PYTHON not declared in the engine — the floor must be stated in code")
+floor = (int(m.group(1)), int(m.group(2)))
+bad = []
+for path in sorted(glob.glob(os.path.join(root, "kit/templates/hooks/*.py"))):
+    try:
+        ast.parse(open(path).read(), feature_version=floor)
+    except SyntaxError as e:
+        bad.append("%s: %s" % (os.path.basename(path), e))
+if bad:
+    sys.exit("syntax above the %d.%d floor:\n  %s" % (floor[0], floor[1], "\n  ".join(bad)))
+print("ok: every shipped hook parses at the %d.%d floor" % floor)
+PYEOF
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -92,8 +120,21 @@ match: argv
 Branch first.
 EOF
 
-verdict() {  # reads stdin JSON hook input, prints DENY|WARN|ALLOW
-  python3 "$ENGINE" | python3 -c 'import sys,json;d=json.load(sys.stdin);print("DENY" if d.get("hookSpecificOutput",{}).get("permissionDecision")=="deny" else ("WARN" if d.get("systemMessage") else "ALLOW"))'
+verdict() {  # reads stdin JSON hook input, prints DENY|WARN|ALLOW|NOTENFORCING
+  # NOTENFORCING is checked first and separately from WARN on purpose: an inert rule set
+  # used to be indistinguishable from a clean pass, which is the whole bug in issue #29.
+  "$PY" "$ENGINE" | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+msg = d.get("systemMessage") or ""
+if "ARE NOT ENFORCING" in msg:
+    print("NOTENFORCING")
+elif d.get("hookSpecificOutput", {}).get("permissionDecision") == "deny":
+    print("DENY")
+elif msg:
+    print("WARN")
+else:
+    print("ALLOW")'
 }
 expect() {  # expect "<label>" "<want>" "<json>"
   got="$(printf '%s' "$3" | verdict)"
@@ -225,5 +266,35 @@ severity: block
 blocked.
 EOF
 expect "no surface field defaults to agent" DENY "$probe"
+
+# --- a failed rule set must be loud, not silently empty (issue #29) ---
+# The 3.8 dict-union bug made load_rules raise for *every* file. The engine caught it,
+# exited 0 with no decision, and the action proceeded: fail-protective for one rule had
+# become fail-open for the whole set. These assert the two halves stay distinguishable.
+rm -f "$WORK"/.claude/guardrails/*.md
+
+# A directory named like a rule file fails to open for every reader, no chmod needed.
+mkdir -p "$WORK/.claude/guardrails/unreadable.md"
+expect "a rule set where nothing loads reports NOT ENFORCING" NOTENFORCING "$probe"
+rmdir "$WORK/.claude/guardrails/unreadable.md"
+
+# One broken rule among several must not take the others down with it.
+mkdir -p "$WORK/.claude/guardrails/unreadable.md"
+cat > "$WORK/.claude/guardrails/still-good.md" <<'EOF'
+---
+name: still-good
+enabled: true
+event: file
+pattern: 'surfaced\.txt$'
+severity: block
+---
+blocked.
+EOF
+expect "one broken rule does not disable the rest" DENY "$probe"
+rmdir "$WORK/.claude/guardrails/unreadable.md"
+rm -f "$WORK"/.claude/guardrails/*.md
+
+# An empty rules directory is a legitimate "nothing to enforce", not a failure.
+expect "no rules at all is ALLOW, not NOT ENFORCING" ALLOW "$probe"
 
 echo "✅ engine smoke test passed"

@@ -56,6 +56,21 @@ Two properties to preserve when adding a flag:
 - **Fail protective.** Every probe is best-effort. No git, no manifest, an unparseable command, a detached HEAD — the rule must fall back to behaving as a plain pattern match (or stay silent, for a rule that *adds* blocking). It must never quietly drop an existing safety rule.
 - **Never raise.** The engine allows the action on any internal error. A guardrail that crashes the hook would block every tool call in the workspace.
 
+#### One rule failing vs. the whole rule set failing
+
+These two are not the same event, and conflating them is how "enforced, not advisory" quietly stops being true. Failing protective is scoped to **one rule**: the rest of the set still enforces, so degrading that rule is a proportionate response. A failure that takes out **every** rule is different — the engine has no decision to make, so the action proceeds, and the workspace has no guardrails at all while looking exactly like a clean pass.
+
+So the engine treats them differently:
+
+| Event | Behaviour |
+|---|---|
+| One rule file unreadable or malformed | Skipped. The remaining rules load and enforce. |
+| Rule files exist but **none** load | `RuleSetError` → a `systemMessage` beginning **`⛔ LODESTAR GUARDRAILS ARE NOT ENFORCING`**. |
+| Interpreter below `MIN_PYTHON` | Same message, checked before anything else runs. |
+| No rule files at all | `{}`. Nothing to enforce is a legitimate state, not a failure. |
+
+**Python floor.** Both enforcement hooks declare `MIN_PYTHON = (3, 8)` — Ubuntu 20.04 LTS and RHEL 8 ship 3.8 as `python3`. The floor is not decorative: this class of bug produces no stack trace a user will see, only silence. A dict-union expression (`a | b`, 3.9+) once made `load_rules` raise for every file, and the whole rule set went inert behind one easily-missed line of `systemMessage`. CI runs `test-engine.sh` and `test-precommit.sh` against the floor and the current release; both take `LODESTAR_TEST_PYTHON` so you can do the same locally. Raising the floor means changing `MIN_PYTHON` in both hooks, the CI matrix, and the README Requirements table together.
+
 ### Enforcement surface — who the rule holds for
 
 The PreToolUse engine only fires when *Claude* is about to act. A teammate in their IDE, or CI, never touches that path, so a rule is only as universal as its **surface**:

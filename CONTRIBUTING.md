@@ -70,6 +70,17 @@ bash   .github/scripts/test-freshness.sh     # map drift, in BOTH workspace layo
 bash   .github/scripts/test-permissions.sh   # permission surface: idempotent, reversible deny merge
 ```
 
+If you touched a hook in `kit/templates/hooks/`, also run the two enforcement suites
+against the Python floor (`MIN_PYTHON` in the hooks). CI does this in the `python-floor`
+job because a version-floor break is silent — it makes every rule inert rather than
+failing:
+
+```bash
+FLOOR="$(uv python find 3.8)"   # or any 3.8 interpreter on your PATH
+LODESTAR_TEST_PYTHON="$FLOOR" bash .github/scripts/test-engine.sh
+LODESTAR_TEST_PYTHON="$FLOOR" bash .github/scripts/test-precommit.sh
+```
+
 Bump `VERSION` and add a matching top entry to `CHANGELOG.md` in the same change —
 `validate.py` enforces that they agree, and a bump on `main` cuts a release.
 
