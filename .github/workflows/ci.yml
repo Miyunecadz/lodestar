@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Shellcheck install.sh
-        run: shellcheck --severity=error install.sh .github/scripts/test-install.sh .github/scripts/test-precommit.sh .github/scripts/test-coverage.sh
+        run: shellcheck --severity=error install.sh .github/scripts/test-install.sh .github/scripts/test-precommit.sh .github/scripts/test-coverage.sh .github/scripts/test-freshness.sh
 
       - name: Validate catalog + version consistency
         run: python3 .github/scripts/validate.py
@@ -33,3 +33,6 @@ jobs:
 
       - name: Smoke-test graph coverage
         run: bash .github/scripts/test-coverage.sh
+
+      - name: Smoke-test graph freshness
+        run: bash .github/scripts/test-freshness.sh

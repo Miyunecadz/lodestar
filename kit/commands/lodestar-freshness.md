@@ -57,7 +57,7 @@ So two branches that both rebuilt a graph merge cleanly:
 
 ## 6. Install drift detection (markdown repos, and as a general check)
 - Copy `.lodestar/templates/hooks/lodestar-freshness-check.py` → `.claude/hooks/lodestar-freshness-check.py`.
-- It reads the manifest and, per repo, diffs `mapping.lastMappedSha..HEAD` for code under the repo path — reporting any **markdown** repo whose code moved since it was last mapped, and pointing at `/lodestar-refresh <repo>`. graphify lockstep repos are reported as auto-maintained.
+- It reads the manifest and, per repo, resolves that repo's git root and diffs `mapping.lastMappedSha..HEAD` there — reporting any **markdown** repo whose code moved since it was last mapped, and pointing at `/lodestar-refresh <repo>`. graphify lockstep repos are reported as auto-maintained. Because the git root is resolved per repo, the verdict is the same in either layout and does not depend on where the checker is run from.
 - Offer to surface it where the user will see it (pick per the user's setup, don't force one):
   - a **post-commit** or **post-merge/post-checkout** hook that runs `python3 .claude/hooks/lodestar-freshness-check.py` (report-only, never blocks), and/or
   - a CI step: `python3 .claude/hooks/lodestar-freshness-check.py --exit-code` (fails the build on drift).

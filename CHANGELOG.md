@@ -2,6 +2,21 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.12.0] — Unreleased
+
+Drift detection asked its question in the wrong repository. `mapping.lastMappedSha` is recorded from an onboarded repo's own HEAD, but the checker ran `git diff` in whatever directory it was invoked from — so it only ever worked when the workspace root *was* the git repo. In the separate-sub-repos layout that `ARCHITECTURE.md` §6 calls the default, the range could never resolve and every repo reported `that commit isn't in history`, drifted or not. Closes #21.
+
+### Fixed
+- **`lodestar-freshness-check.py` resolves each repo's git root and runs there.** Both layouts now fall out of one code path: a monorepo yields the workspace root plus a path prefix to filter by, separate sub-repos yield the repo itself and no prefix. The verdict no longer depends on the caller's working directory.
+- **Three degraded states are now distinct**, because they need different advice: *no git repository at that path* (nothing to check), *the fingerprint is not in this repo's history* (a rewrite — re-map to reset), and *the diff could not be evaluated*. Collapsing them is what let a workspace where git was never consulted report a stale-fingerprint error.
+- **`workspace_of()` derives the workspace from the manifest path**, not from `git rev-parse`, since the workspace root frequently is not a repository.
+
+### Added
+- **`.github/scripts/test-freshness.sh`** (new CI gate, 15 checks) — builds a workspace in each supported layout and asserts drift, freshness, cwd-independence, per-repo isolation in a monorepo, every degraded state, and that a missing or unparseable manifest still exits 0. Verified to fail against the previous implementation.
+
+### Upgrading
+Run `/lodestar-update`, which refreshes `.claude/hooks/lodestar-freshness-check.py` if you have it installed. No manifest or rule changes. If drift detection has been reporting `isn't in history` for every repo, that was this bug — the fingerprints in your manifest are fine and no re-map is needed.
+
 ## [0.11.0] — Unreleased
 
 Design-guidance pass — Lodestar *referenced* Anthropic's `frontend-design` skill but only as a soft, opt-in dependency, so a frontend workspace could generate UI with no anti-slop guidance behind it and no signal that anything was missing. Closes #6.

@@ -7,11 +7,11 @@ branches, and every change reaching `main` goes through a pull request.
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ci.yml` | every PR + push to `main` | shellchecks `install.sh` and the shell tests, validates the catalog + `VERSION`↔`CHANGELOG`, and smoke-tests the guardrail engine, the installer, the commit-surface checker, and graph coverage. **This is the required status check.** |
+| `ci.yml` | every PR + push to `main` | shellchecks `install.sh` and the shell tests, validates the catalog + `VERSION`↔`CHANGELOG`, and smoke-tests the guardrail engine, the installer, the commit-surface checker, graph coverage, and graph freshness. **This is the required status check.** |
 | `release.yml` | push to `main` that changes `VERSION` | tags `vX.Y.Z` and cuts a GitHub Release from that version's `CHANGELOG` section. No manual tagging. |
 | `guard-default-branch.yml` | push to `main` | **backstop**: fails if a commit reached `main` without a merged PR (see the note below). |
 
-Helper scripts live in `.github/scripts/` (`validate.py`, `test-engine.sh`, `test-install.sh`, `test-precommit.sh`, `test-coverage.sh`) and run locally too. `test-install.sh` builds a throwaway local git repo as its "remote", so it exercises the bootstrap and tag-pinning paths without network access. `test-precommit.sh` builds a throwaway git repo, stages violations, and asserts the checker blocks only what it should — including that it never breaks a commit on a broken rule or a missing tool. `test-coverage.sh` builds a synthetic repo plus hand-written complete/partial/stale graphs, so it runs without a graphify install and exercises the checker's fallback classifier.
+Helper scripts live in `.github/scripts/` (`validate.py`, `test-engine.sh`, `test-install.sh`, `test-precommit.sh`, `test-coverage.sh`) and run locally too. `test-install.sh` builds a throwaway local git repo as its "remote", so it exercises the bootstrap and tag-pinning paths without network access. `test-precommit.sh` builds a throwaway git repo, stages violations, and asserts the checker blocks only what it should — including that it never breaks a commit on a broken rule or a missing tool. `test-coverage.sh` builds a synthetic repo plus hand-written complete/partial/stale graphs, so it runs without a graphify install and exercises the checker's fallback classifier. `test-freshness.sh` builds a workspace in **each** supported layout — a monorepo, and sibling repos under a root that is not a git repo — and asserts the drift verdict is the same regardless of where the checker is invoked from; the layout is the axis that matters, because `lastMappedSha` belongs to a specific repository's history.
 
 ## Cutting a release (trunk-based)
 
