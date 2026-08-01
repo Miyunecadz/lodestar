@@ -2,7 +2,28 @@
 
 All notable changes to Lodestar are documented here.
 
-## [0.17.0] — Unreleased
+Headings carry the release date. `— Unreleased` marks the version in development (always the top entry, matching `VERSION`). `— not released` marks a version that was written up but never cut — see 0.8.0 / 0.9.0 below. `validate.py` enforces all three.
+
+## [0.18.0] — Unreleased
+
+Every `CHANGELOG.md` heading said `— Unreleased`, including the twelve versions that are tagged and published. Closes #33.
+
+The issue also states that `release.yml` copies this into the GitHub Release, so published notes read "Unreleased". That part is not true: the extraction regex matches `## [version]` and everything to end of line, then captures only what follows, so the heading never reaches the notes — confirmed against the published v0.17.0 body. The real cost is narrower and still worth fixing: the changelog is wrong when read directly, in the repo or on GitHub, and `/lodestar-update` step 4 summarises "notable changes for the new version" straight from the fetched file.
+
+`validate.py` exists to catch exactly this class of drift — it already checks `VERSION` against the top heading and catalog totals against the file count. Release status is the same kind of mechanically checkable claim, and it was the one going unchecked.
+
+### Fixed
+- **Every tagged version's heading carries its release date**, taken from the tagged commit. Twelve headings backfilled: 0.4.0–0.7.0, 0.10.0–0.17.0.
+- **0.8.0 and 0.9.0 are marked `— not released`**, which is the truth. Both were merged in a squash that also carried a later version bump, so `release.yml` — which triggers on a push to `main` that changes `VERSION` — fired once and skipped them. Their content shipped inside 0.10.0. They are not retro-tagged: a tag invented now would point at a commit that was never released under that name, which is a worse record than saying so plainly. 0.1.0–0.3.0 get the same marker; they predate the release pipeline, which landed with 0.4.0.
+
+### Added
+- **`validate.py` enforces release status** against the actual git tags:
+  - a tagged version's heading must carry an ISO date, never `Unreleased`;
+  - an untagged version below the top must say `— not released`, so a version that was never cut cannot masquerade as pending;
+  - the top heading must be `— Unreleased` **and** must not already be tagged — if it is, `VERSION` was not bumped, which is the mistake that produced 0.8.0 and 0.9.0.
+- **`docs/CI.md`** documents the check and the one manual step it implies: stamp the previous version's date in the same PR that bumps `VERSION`.
+
+## [0.17.0] — 2026-08-01
 
 The pre-commit checker resolved staged file paths against the **workspace**, but `git diff --cached` reports them relative to the **committing repo's git root**. In the separate-sub-repos layout — each repo its own git repo, `.claude/` in the parent — the two differ, so every staged path resolved to a file under no onboarded repo. `stacks_for` returned `None`, `in_scope` failed protective and returned `True`, and stack-scoped rules fired **with no scoping at all**. Closes #28.
 
@@ -22,7 +43,7 @@ The pre-commit checker resolved staged file paths against the **workspace**, but
 ### Note on the proposed fix
 The issue also proposed extracting the shared frontmatter helpers into one module both hooks import. That is declined: `.claude/skills/hook-engine-invariants` requires each hook to work when copied into `.claude/hooks/` alone, and the duplication is deliberate. Inspecting the actual drift showed the parsers are **behaviourally identical** and differ only in style — `stacks_for` and `default_branch` differ in shape because the engine caches context in an object across one invocation while the commit hook is a one-shot process, which a shared module would not have unified anyway. `test-hook-parity.py` gets the property the extraction was after — the next divergence cannot be silent — without trading away the self-contained-file invariant.
 
-## [0.16.0] — Unreleased
+## [0.16.0] — 2026-08-01
 
 Four small hardening fixes. Individually minor; together they close the gaps where a shipped file is unbounded, unparseable, or unlinted. Closes #31, #35, #38, #34.
 
@@ -39,7 +60,7 @@ Four small hardening fixes. Individually minor; together they close the gaps whe
 - **`test-graph-refresh.sh`** (new CI gate, 16 checks) — the first test of any kind for `lodestar-graph-refresh.sh`. graphify is stubbed via `LODESTAR_GRAPHIFY_BIN`, so it needs no graphify install. It pins the contract that hook cannot break: it never fails a commit (missing tool, failing tool, no manifest, no artifacts, unrelated staged files) and stages exactly the artifacts it found and nothing else. Having no test is how the dead guard survived; shellcheck alone would not have caught the `git add` behaviour either way.
 - **`test-install.sh` installs from a path containing a space and a quote** and asserts `source.json` parses and `origin` round-trips exactly.
 
-## [0.15.0] — Unreleased
+## [0.15.0] — 2026-08-01
 
 The commit-surface secret scan treated **any** non-zero exit from `gitleaks` as "secrets found". A gitleaks *invocation* failure — a removed subcommand, a malformed `.gitleaks.toml`, an unsupported flag after an upgrade — therefore blocked the commit with usage text presented as leaked credentials. Because `scan-secrets-before-commit` sets `commit_severity: block`, that stopped every committer on the team, including teammates who never use Claude, and CI. Closes #24.
 
@@ -60,7 +81,7 @@ The checker's own docstring sets the contract: *"A guardrail that breaks unrelat
 ### Changed
 - **`docs/EXTENDING.md`** gains a `secret-scan` degradation table under the `commit_check` reference, and explains why the two degradations are reported differently.
 
-## [0.14.0] — Unreleased
+## [0.14.0] — 2026-08-01
 
 The guardrail engine required Python 3.9+ without saying so, and on 3.8 it did not fail — it *allowed*. A dict-union expression in `load_rules` raised for every rule file, the outer handler caught it, and the hook exited 0 with no `permissionDecision`. Every rule in the workspace, `block` rules included, was inert behind one line of `systemMessage` that is easy to miss in a busy session. Ubuntu 20.04 LTS and RHEL 8 ship 3.8 as `python3`. Closes #29.
 
@@ -82,7 +103,7 @@ The one-line fix is the smallest part of this. The failure was invisible because
 - **`docs/EXTENDING.md`** gains a "one rule failing vs. the whole rule set failing" section next to the never-raise invariant, and documents the floor and how to raise it.
 - **`docs/CI.md`** describes the new job and why a single-interpreter CI could not catch this class of bug.
 
-## [0.13.0] — Unreleased
+## [0.13.0] — 2026-08-01
 
 `block-env-files` and `block-secret-files` are titled "block **reads** and writes". They did not block reads. The PreToolUse engine is registered for `Bash|Edit|Write|MultiEdit`, so a `Read` never reached it — the strongest-worded rules in the catalog were, on their headline claim, advisory. Closes #23.
 
@@ -105,7 +126,7 @@ Run `/lodestar-update`, then **re-run `/lodestar-guardrails`** — an update nev
 
 Using an env tier the shipped list does not name (`.env.staging`, `.env.qa`)? Add it to `permission_rules` in `.claude/guardrails/block-env-files.md` and re-run the applier; the write and commit surfaces already covered it through the regex.
 
-## [0.12.0] — Unreleased
+## [0.12.0] — 2026-08-01
 
 Drift detection asked its question in the wrong repository. `mapping.lastMappedSha` is recorded from an onboarded repo's own HEAD, but the checker ran `git diff` in whatever directory it was invoked from — so it only ever worked when the workspace root *was* the git repo. In the separate-sub-repos layout that `ARCHITECTURE.md` §6 calls the default, the range could never resolve and every repo reported `that commit isn't in history`, drifted or not. Closes #21.
 
@@ -120,7 +141,7 @@ Drift detection asked its question in the wrong repository. `mapping.lastMappedS
 ### Upgrading
 Run `/lodestar-update`, which refreshes `.claude/hooks/lodestar-freshness-check.py` if you have it installed. No manifest or rule changes. If drift detection has been reporting `isn't in history` for every repo, that was this bug — the fingerprints in your manifest are fine and no re-map is needed.
 
-## [0.11.0] — Unreleased
+## [0.11.0] — 2026-08-01
 
 Design-guidance pass — Lodestar *referenced* Anthropic's `frontend-design` skill but only as a soft, opt-in dependency, so a frontend workspace could generate UI with no anti-slop guidance behind it and no signal that anything was missing. Closes #6.
 
@@ -149,7 +170,7 @@ The spike documents both integration paths (a `has-impeccable`-gated settings-ho
 
 Re-run `/lodestar-agents` in a frontend workspace: `ui-designer` is now pre-checked, and the plugin prompt records its outcome. Re-run `/lodestar-guardrails` to pick up `design-guidance-on-ui-edits`. Until then nothing changes.
 
-## [0.10.0] — Unreleased
+## [0.10.0] — 2026-07-31
 
 Catalog-coverage pass — onboarding a Laravel/PHP + Next.js monorepo produced **zero** stack-specific entries for either repo, two of the most common web stacks, and the gap was recorded only as a string in the manifest. Closes #4.
 
@@ -173,7 +194,7 @@ Catalog-coverage pass — onboarding a Laravel/PHP + Next.js monorepo produced *
 
 Re-run `/lodestar-onboard ./<repo>` on a Laravel or Next.js repo to pick up the new detectors and skills, then `/lodestar-guardrails` and `/lodestar-agents` to tick the new entries. Existing repos are unaffected until you do.
 
-## [0.9.0] — Unreleased
+## [0.9.0] — not released
 
 Graph-completeness pass — a map can be *born* incomplete, and nothing checked. Node counts were never compared against the source tree, so a graph missing whole files looked identical to a complete one. Because `CLAUDE.md` tells agents to prefer querying the graph over re-reading source, that misleads an agent exactly like a stale map does. Closes #5.
 
@@ -199,7 +220,7 @@ Graph-completeness pass — a map can be *born* incomplete, and nothing checked.
 
 Nothing to do — existing graphs are untouched. Coverage is recorded the next time a repo is onboarded or refreshed. To check an already-onboarded workspace now: `python3 .lodestar/templates/hooks/lodestar-graph-coverage.py`.
 
-## [0.8.0] — Unreleased
+## [0.8.0] — not released
 
 Enforcement-surface pass — the safety guardrails were `PreToolUse` hooks, so they held against Claude and nobody else. A teammate in their IDE, or CI, could commit exactly what every "safety" rule exists to prevent. Rules now declare which surface they hold on, and commit-surface rules are enforced by a generated pre-commit hook for every committer. Closes #3.
 
@@ -225,7 +246,7 @@ Enforcement-surface pass — the safety guardrails were `PreToolUse` hooks, so t
 ### Upgrading
 
 Existing installs keep working unchanged — the commit surface is opt-in. Re-run `/lodestar-guardrails` to adopt the `surface` metadata and install the pre-commit hook; until then every rule behaves exactly as before (Claude-only).
-## [0.7.0] — Unreleased
+## [0.7.0] — 2026-07-31
 
 Distribution pass — installing Lodestar no longer leaves you holding a clone you never asked for, and updates move between released tags instead of pulling whatever is on `main`. Closes #9.
 
@@ -247,7 +268,7 @@ Distribution pass — installing Lodestar no longer leaves you holding a clone y
 
 Existing clone-based installs keep working with no action — `source.json` is written on the next update and records the clone path, preserving `git pull` + re-install. To stop carrying a clone: re-install with the bootstrap one-liner over the same workspace (generated content is untouched), then delete the clone.
 
-## [0.6.0] — Unreleased
+## [0.6.0] — 2026-07-31
 
 Guardrail engine pass — rules were stateless regex matchers, so several shipped rules over-blocked legitimate work or under-enforced what their names promised. The engine now computes a small context layer that rules opt into declaratively. Closes #11.
 
@@ -272,7 +293,7 @@ Guardrail engine pass — rules were stateless regex matchers, so several shippe
 
 `/lodestar-update` refreshes the **engine**, but your enabled rules in `.claude/guardrails/` are generated content and are deliberately left untouched. They keep working as-is (a rule with no context flags behaves exactly as before), so **re-run `/lodestar-guardrails`** to adopt the corrected rules and pick up `block-commit-to-default-branch`.
 
-## [0.5.0] — Unreleased
+## [0.5.0] — 2026-07-20
 
 Repo layout pass — separate what Lodestar *ships* from how this repo is *built*. Purely structural: the installed workspace is byte-identical to 0.4.0.
 
@@ -280,7 +301,7 @@ Repo layout pass — separate what Lodestar *ships* from how this repo is *built
 - **Kit source now lives under `kit/`.** `catalog/`, `templates/`, and the `lodestar-*` command specs (previously in `.claude/commands/`) moved to `kit/catalog/`, `kit/templates/`, `kit/commands/`. `install.sh`, the CI validator, the engine smoke test, and doc/README links were repointed. The target-workspace layout it produces (`.lodestar/…`, `.claude/commands/…`) is unchanged.
 - **Root `.claude/` is now this repo's own dev tooling**, not a product surface — free for contributor agents/skills/workflows/settings. See `CONTRIBUTING.md`. `install.sh` only ever copies from `kit/`, so nothing in `.claude/` can leak into the product. (Side effect: the `lodestar-*` commands are no longer live while developing this repo — install into a scratch workspace to exercise them.)
 
-## [0.4.0] — Unreleased
+## [0.4.0] — 2026-07-20
 
 Graph-freshness pass — the onboarded architecture map now stays in sync with the code instead of silently drifting. Because `CLAUDE.md` tells agents to *trust* the graph over re-reading source, a stale map was a correctness risk, not just staleness. Closes the core of #2.
 
@@ -296,7 +317,7 @@ Graph-freshness pass — the onboarded architecture map now stays in sync with t
 - **`install.sh` / `/lodestar-update`** re-sync the freshness hooks (`lodestar-graph-refresh.sh`, `lodestar-freshness-check.py`) — but only if a workspace already installed them, mirroring the guardrail-engine refresh. Generated content (manifest, `.gitattributes`, git-hook wiring) is never touched.
 - `docs/ARCHITECTURE.md` documents the freshness layer, the manifest fingerprint, and updates the roadmap; `catalog/CATALOG.md` lists the new templates.
 
-## [0.3.0] — Unreleased
+## [0.3.0] — not released
 
 Distribution & updatability pass — Lodestar is now branded, collision-safe, and updatable in place (no more delete-and-re-clone).
 
@@ -308,7 +329,7 @@ Distribution & updatability pass — Lodestar is now branded, collision-safe, an
 ### Changed
 - **Branded, collision-safe commands** — namespaced under a `lodestar-` prefix: `/onboard-repo` → `/lodestar-onboard`, `/guardrails` → `/lodestar-guardrails`, `/gen-agents` → `/lodestar-agents` (`/lodestar-init` unchanged). Avoids clashing with other tools' commands. Existing installs pick up the rename on the next `/lodestar-update`.
 
-## [0.2.0] — Unreleased
+## [0.2.0] — not released
 
 Architecture, portability, and adaptivity pass over the 0.1.0 baseline. Catalog now **38 entries** — 17 universal · 14 Node·GraphQL·RN · 7 Python·Django.
 
@@ -329,7 +350,7 @@ Architecture, portability, and adaptivity pass over the 0.1.0 baseline. Catalog 
 - File guardrails now match the edited **path** as intended (the previous plugin matched edited *content*, so path-based rules never fired).
 - Corrected stale `<api>-contract.md` placeholders and a Graphify output filename in the docs.
 
-## [0.1.0] — Unreleased
+## [0.1.0] — not released
 
 Initial version — not yet published.
 
