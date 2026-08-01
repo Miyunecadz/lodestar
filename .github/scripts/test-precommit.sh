@@ -173,16 +173,101 @@ unstage
 git -C "$WS" checkout -q -- db/migrations/001_init.sql
 
 # --- secret scanning of staged content ----------------------------------------------
-printf 'aws = "AKIAIOSFODNN7EXAMPLE"\n' > "$WS/config.py"
+# The fixture must be a credential BOTH scanners recognise, or this silently tests only
+# whichever branch the machine happens to take. A synthetic GitHub PAT matches gitleaks'
+# `github-pat` rule and the built-in `gh[pousr]_…` pattern. The previous fixture was
+# `AKIA` + `IOSFODNN7EXAMPLE` — AWS's published documentation key, which modern gitleaks
+# deliberately does not flag, so the gitleaks branch here could never pass on a machine
+# that actually had gitleaks. It stayed green only because CI has no scanner installed.
+FAKE_PAT="ghp_012345678901234567890123456789012345"
+printf 'token = "%s"\n' "$FAKE_PAT" > "$WS/config.py"
 git -C "$WS" add config.py
 if command -v gitleaks >/dev/null 2>&1; then
-  expect "staged AWS key blocks (gitleaks)" 1
+  expect "staged token blocks (gitleaks)" 1
 else
   # No scanner → built-ins warn instead of blocking, on purpose.
-  expect "staged AWS key warns (no gitleaks)" 0
-  contains "warn names the finding" "AWS access key id"
+  expect "staged token warns (no gitleaks)" 0
+  contains "warn names the finding" "GitHub token"
   contains "warn explains downgrade" "gitleaks"
 fi
+unstage
+git -C "$WS" rm -q --cached config.py 2>/dev/null || true
+
+# --- gitleaks: a tool failure is not a finding (issue #24) ---------------------------
+# The checker used to treat ANY non-zero gitleaks exit as "secrets found", so a removed
+# subcommand or a malformed .gitleaks.toml blocked every committer's commit with usage
+# text presented as leaked credentials. These stubs pin the distinction. They are stubs
+# rather than a real gitleaks because the cases worth testing are the ones a working
+# install cannot produce.
+STUB_BIN="$WORK/stub-bin"; mkdir -p "$STUB_BIN"
+REAL_PATH="$PATH"
+stub() {  # stub <<'SH' … writes an executable fake gitleaks and puts it first on PATH
+  cat > "$STUB_BIN/gitleaks"; chmod +x "$STUB_BIN/gitleaks"; export PATH="$STUB_BIN:$REAL_PATH"
+}
+
+printf 'token = "%s"\n' "$FAKE_PAT" > "$WS/config.py"
+git -C "$WS" add config.py
+
+# 1. Scanner is broken (bad config, bad flag): exits 2, writes no report.
+stub <<'SH'
+#!/usr/bin/env bash
+case "$1" in version|--version) echo "8.28.0"; exit 0;; esac
+echo "Error: failed to load config: toml: line 3: expected '.' or '=' " >&2
+echo "Usage: gitleaks [command]"
+exit 2
+SH
+expect "a broken gitleaks does not block the commit" 0
+contains "broken scanner is reported, not silent" "produced no verdict"
+contains "broken scanner names its version" "8.28.0"
+
+# 2. Deprecated subcommand: `git` is unknown (exit 1 + usage, no report), `protect`
+#    works. The newer spelling is tried first, and its failure must fall through
+#    rather than being reported as findings.
+stub <<'SH'
+#!/usr/bin/env bash
+case "$1" in version|--version) echo "8.2.0"; exit 0;; esac
+if [ "$1" = "git" ]; then echo 'Error: unknown command "git" for "gitleaks"'; exit 1; fi
+out=""; while [ $# -gt 0 ]; do [ "$1" = "--report-path" ] && out="$2"; shift; done
+cat > "$out" <<'JSON'
+[{"File":"config.py","RuleID":"github-pat","StartLine":1,"Secret":"ghp_012345678901234567890123456789012345"}]
+JSON
+exit 1
+SH
+expect "falls back to the deprecated subcommand and blocks" 1
+contains "finding reported as file:line: rule" "config.py:1: github-pat"
+
+# 3. A finding must never echo the secret into the terminal or a build log.
+set +e; leaked="$(run_check)"; set -e
+if printf '%s' "$leaked" | grep -q "ghp_012345678901234567890123456789012345"; then
+  echo "FAIL: the report echoed the secret itself"; fail=$((fail+1))
+else echo "ok: the secret itself is not echoed"; pass=$((pass+1)); fi
+
+# 4. Exit 1 with usage text and no report is a failure, not twenty findings. This is
+#    the exact shape that used to block every commit in the workspace.
+stub <<'SH'
+#!/usr/bin/env bash
+case "$1" in version|--version) echo "8.99.0"; exit 0;; esac
+echo "Usage: gitleaks [command]"; echo "Available Commands:"; echo "  detect"; echo "  dir"
+exit 1
+SH
+expect "exit 1 with no report does not block" 0
+contains "usage text is not reported as credentials" "without a findings report"
+
+# 5. A clean scan stays clean and stays quiet.
+stub <<'SH'
+#!/usr/bin/env bash
+case "$1" in version|--version) echo "8.28.0"; exit 0;; esac
+out=""; while [ $# -gt 0 ]; do [ "$1" = "--report-path" ] && out="$2"; shift; done
+printf '[]' > "$out"
+exit 0
+SH
+expect "a clean gitleaks scan allows" 0
+set +e; clean_out="$(run_check)"; set -e
+if printf '%s' "$clean_out" | grep -q "not fully checked"; then
+  echo "FAIL: a working scanner reported a degradation"; fail=$((fail+1))
+else echo "ok: a working scanner is quiet"; pass=$((pass+1)); fi
+
+export PATH="$REAL_PATH"
 unstage
 git -C "$WS" rm -q --cached config.py 2>/dev/null || true
 

@@ -38,12 +38,21 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 GIT_TIMEOUT = 10  # generous: gitleaks on a large staged diff
 
 # Kept in step with lodestar-guardrails.py — the two hooks share a rule set, so a floor
 # that differed between them would mean a rule enforcing on one surface and not the other.
 MIN_PYTHON = (3, 8)
+
+# How to ask gitleaks to scan the staged diff, newest spelling first. `protect` was
+# deprecated in favour of `git`; on a release where it no longer exists the invocation
+# fails, which must read as a tool failure and not as "credentials found".
+GITLEAKS_SUBCOMMANDS = (
+    ["git", "--staged"],      # gitleaks 8.19+
+    ["protect", "--staged"],  # older releases
+)
 
 # Conservative fallback patterns, used only when no real scanner is installed. Kept
 # narrow on purpose — a false positive here interrupts someone else's commit.
@@ -277,25 +286,76 @@ def check_staged_paths(rule, staged, workspace, repos):
     return hits
 
 
-def check_secret_scan(rule):
-    """Scan the staged diff for credentials. Returns (hits, downgraded_to_warn)."""
-    if have("gitleaks"):
-        for args in (
-            ["gitleaks", "protect", "--staged", "--no-banner"],
-            ["gitleaks", "git", "--staged", "--no-banner"],
-        ):
-            rc, out = run(args)
-            if rc is None:
-                continue
-            if rc == 0:
-                return [], False
-            findings = [ln for ln in out.splitlines() if ln.strip()][:20]
-            return (findings or ["gitleaks reported findings in the staged diff"]), False
-    # No scanner installed: fall back to conservative built-ins and only ever warn,
-    # since these heuristics are not precise enough to stop someone else's commit.
+def gitleaks_version():
+    """Best-effort version string — a support question about a spurious block is not
+    answerable without it. `version` is the v8 spelling; `--version` covers the rest."""
+    for args in (["gitleaks", "version"], ["gitleaks", "--version"]):
+        rc, out = run(args)
+        if rc == 0 and out.strip():
+            return out.strip().splitlines()[0].strip()
+    return "unknown"
+
+
+def describe_finding(finding):
+    """One gitleaks JSON finding → `file:line: rule`. Never the secret itself: this goes
+    to a terminal and, on the CI path, into a build log."""
+    path = finding.get("File") or "?"
+    rule = finding.get("RuleID") or finding.get("Description") or "secret"
+    line = finding.get("StartLine")
+    where = "%s:%s" % (path, line) if isinstance(line, int) and line > 0 else str(path)
+    return "%s: %s" % (where, rule)
+
+
+def run_gitleaks(subcommand):
+    """Scan the staged diff with one gitleaks spelling.
+
+    Returns `(findings, failure)` where exactly one side is meaningful: a list (possibly
+    empty) means the scan ran and its verdict stands; a string means gitleaks did not
+    produce a verdict and the caller must degrade rather than report credentials.
+
+    The discriminator is the **report**, not the exit code alone. gitleaks exits 1 both
+    for "leaks found" and for several fatal errors — an unknown subcommand, a malformed
+    `.gitleaks.toml`, an unsupported flag after an upgrade — so an exit code by itself
+    cannot tell a finding from a usage message. A scan that actually ran writes a JSON
+    report; one that died before scanning does not.
+    """
+    handle, report = tempfile.mkstemp(prefix="lodestar-gitleaks-", suffix=".json")
+    os.close(handle)
+    try:
+        rc, out = run(
+            ["gitleaks"] + subcommand
+            + ["--no-banner", "--report-format", "json", "--report-path", report]
+        )
+        if rc is None:
+            return None, "`gitleaks %s` could not be executed" % subcommand[0]
+        try:
+            with open(report, "r") as f:
+                text = f.read().strip()
+            data = json.loads(text) if text else []
+        except (IOError, OSError, ValueError):
+            data = None
+        if rc == 0:
+            return [], None  # scanned, nothing found
+        if rc == 1 and isinstance(data, list) and data:
+            return [describe_finding(f) for f in data[:20] if isinstance(f, dict)], None
+        first = next((ln.strip() for ln in out.splitlines() if ln.strip()), "")
+        detail = " — %s" % first[:160] if first else ""
+        return None, "`gitleaks %s` exited %d without a findings report%s" % (
+            subcommand[0], rc, detail
+        )
+    finally:
+        try:
+            os.unlink(report)
+        except OSError:
+            pass
+
+
+def builtin_secret_scan():
+    """Conservative pattern scan of the staged diff. Heuristics only — never precise
+    enough to stop someone else's commit, so callers only ever warn on these."""
     rc, diff = run(["git", "diff", "--cached", "-U0"])
     if rc != 0:
-        return [], True
+        return []
     hits, path = [], "?"
     for line in diff.splitlines():
         if line.startswith("+++ b/"):
@@ -307,7 +367,41 @@ def check_secret_scan(rule):
             if re.search(pattern, line):
                 hits.append(f"{path}: possible {label}")
                 break
-    return hits[:20], True
+    return hits[:20]
+
+
+def check_secret_scan(_rule, verbose=False):
+    """Scan the staged diff for credentials. Returns `(hits, note, broken)`.
+
+    `note` is None when the result is authoritative. Otherwise it names why the scan
+    could not be trusted, the hits are heuristic, and the caller downgrades `block` to
+    `warn`. Both degradations — no scanner, and a scanner that failed — take the same
+    path on purpose: this is the one code path that can stop a stranger's commit, and a
+    broken or upgraded binary must never be reported as leaked credentials.
+
+    `broken` separates the two anyway, for reporting only. Having no scanner is a known
+    steady state and saying so on every commit is noise; a scanner that is installed and
+    failing is news, and staying quiet about it would leave someone believing their
+    commits are scanned when they are not.
+    """
+    failure = None
+    if have("gitleaks"):
+        if verbose:
+            print(f"  gitleaks: {gitleaks_version()}")
+        for subcommand in GITLEAKS_SUBCOMMANDS:
+            findings, why = run_gitleaks(subcommand)
+            if why is None:
+                return findings, None, False
+            failure = why  # try the next spelling before giving up on the scanner
+        return builtin_secret_scan(), (
+            "gitleaks %s is installed but produced no verdict (%s) — falling back to "
+            "built-in heuristics, so this warns instead of blocking"
+            % (gitleaks_version(), failure)
+        ), True
+    return builtin_secret_scan(), (
+        "no `gitleaks` installed — built-in heuristics only, so this warns "
+        "instead of blocking"
+    ), False
 
 
 def check_default_branch(_rule):
@@ -344,10 +438,11 @@ def main(argv):
             if rule["_check"] == "staged-paths":
                 hits = check_staged_paths(rule, staged, workspace, repos)
             elif rule["_check"] == "secret-scan":
-                hits, downgraded = check_secret_scan(rule)
-                if downgraded and severity == "block":
-                    severity = "warn"
-                    rule = dict(rule, _note="no `gitleaks` installed — built-in heuristics only, so this warns instead of blocking")
+                hits, note, broken = check_secret_scan(rule, verbose)
+                if note:
+                    rule = dict(rule, _note=note, _broken=broken)
+                    if severity == "block":
+                        severity = "warn"
             elif rule["_check"] == "default-branch":
                 hits = check_default_branch(rule)
             else:
@@ -355,7 +450,12 @@ def main(argv):
         except Exception:
             continue  # a broken rule must never break the commit
         if not hits:
-            if verbose:
+            if rule.get("_broken"):
+                # A clean result from a scanner that failed is not a clean scan. Silence
+                # here would read as "checked, fine" — which is the whole complaint.
+                print(f"\n⚠ [{rule.get('name', 'rule')}] not fully checked")
+                print(f"    {rule['_note']}")
+            elif verbose:
                 print(f"  ok   {rule.get('name', '?')}")
             continue
         (blocking if severity == "block" else warning).append((rule, hits))

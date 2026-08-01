@@ -129,6 +129,21 @@ A `commit`/`both` rule needs something the pre-commit checker can run — `commi
 
 `commit_severity` overrides `severity` on the commit surface only — use it where a rule should merely remind Claude but hard-stop a commit.
 
+#### How `secret-scan` degrades
+
+This is the only check that shells out to a third-party binary, and — paired with `commit_severity: block` — the only code path in Lodestar that can stop a stranger's commit. So it distinguishes a *finding* from a *tool failure*, and never reports the second as the first:
+
+| gitleaks did | Result |
+|---|---|
+| exited 0 | clean scan, authoritative |
+| exited 1 **and** wrote a JSON report with findings | findings, reported as `file:line: rule` — `block` stands |
+| exited non-zero with no usable report | **tool failure** → built-in patterns, `block` degraded to `warn`, and the reason printed even when nothing was found |
+| is not installed | built-in patterns, `block` degraded to `warn`, reported only when something matches |
+
+The discriminator is the **report**, not the exit code: gitleaks exits 1 both for "leaks found" and for several fatal errors (unknown subcommand, malformed `.gitleaks.toml`, unsupported flag after an upgrade), so an exit code alone cannot tell a credential from a usage message. `gitleaks git --staged` is tried before the deprecated `gitleaks protect --staged`. Findings never include the matched secret — the output goes to a terminal and, on the CI path, into a build log.
+
+The two degradations are reported differently on purpose. Having no scanner is a steady state, and announcing it on every commit is the warn fatigue that teaches people `--no-verify`. A scanner that is installed and failing is news: staying quiet would leave someone believing their commits are scanned when they are not.
+
 A rule that reminds rather than forbids should silence itself. Without `requires_manifest_missing` you get one of two bad outcomes: a permanent nag (which trains people to ignore every warn the engine emits) or a one-time message (which is indistinguishable from no rule at all). `design-guidance-on-ui-edits` is the reference: it fires on UI edits while `designGuidance.installed` is false, and never again once it is true.
 
 **Choosing a surface is a judgement about false positives, not about how much you care.** Three rules that look like obvious commit-surface candidates are deliberately `agent`-only:

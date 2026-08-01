@@ -2,6 +2,27 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.15.0] — Unreleased
+
+The commit-surface secret scan treated **any** non-zero exit from `gitleaks` as "secrets found". A gitleaks *invocation* failure — a removed subcommand, a malformed `.gitleaks.toml`, an unsupported flag after an upgrade — therefore blocked the commit with usage text presented as leaked credentials. Because `scan-secrets-before-commit` sets `commit_severity: block`, that stopped every committer on the team, including teammates who never use Claude, and CI. Closes #24.
+
+The checker's own docstring sets the contract: *"A guardrail that breaks unrelated commits would be worse than the gap it closes."* This was the one code path that can break a stranger's commit, and the one that conflated tool failure with a finding. The first time it fires spuriously, the team learns `--no-verify` — and that reflex costs the commit surface for every rule, not just this one.
+
+### Fixed
+- **A gitleaks failure is no longer reported as credentials.** The discriminator is the **report**, not the exit code: gitleaks exits 1 both for "leaks found" and for several fatal errors, so an exit code alone cannot tell a credential from a usage message. A scan that ran writes a JSON report; one that died before scanning does not.
+- **`gitleaks git --staged` is tried before the deprecated `gitleaks protect --staged`.** The old order meant that on a release where `protect` no longer exists, every commit in the workspace blocked.
+- **A tool failure degrades exactly like a missing scanner** — built-in patterns, `block` downgraded to `warn`, with a note naming the failure and the gitleaks version.
+- **Test fixture that could never pass.** The gitleaks branch of `test-precommit.sh` staged `AKIA` + `IOSFODNN7EXAMPLE`, AWS's published documentation key, which modern gitleaks deliberately does not flag. It stayed green only because CI has no scanner installed. Now a synthetic GitHub PAT, which both gitleaks and the built-in patterns detect.
+
+### Added
+- **Findings are parsed from the JSON report** and reported as `file:line: rule` instead of echoing whatever the binary printed. The matched secret is never included — this output goes to a terminal and, on the CI path, into a build log.
+- **A failing scanner is reported even when it finds nothing.** A clean result from a broken scanner is not a clean scan, and silence there reads as "checked, fine". A *missing* scanner stays quiet unless it has something to say — that one is a steady state, and announcing it on every commit is the warn fatigue that teaches people `--no-verify`.
+- **`--verbose` prints the gitleaks version**, so a support question about a spurious block is answerable.
+- **Five stub-driven test cases** covering what a working install cannot produce: a scanner exiting 2 with usage text, exit 1 with usage text and no report, the newer subcommand missing so the deprecated one is used, a finding reported without echoing the secret, and a clean scan staying quiet.
+
+### Changed
+- **`docs/EXTENDING.md`** gains a `secret-scan` degradation table under the `commit_check` reference, and explains why the two degradations are reported differently.
+
 ## [0.14.0] — Unreleased
 
 The guardrail engine required Python 3.9+ without saying so, and on 3.8 it did not fail — it *allowed*. A dict-union expression in `load_rules` raised for every rule file, the outer handler caught it, and the hook exited 0 with no `permissionDecision`. Every rule in the workspace, `block` rules included, was inert behind one line of `systemMessage` that is easy to miss in a busy session. Ubuntu 20.04 LTS and RHEL 8 ship 3.8 as `python3`. Closes #29.
