@@ -26,6 +26,9 @@ jobs:
       - name: Validate catalog + version consistency
         run: python3 .github/scripts/validate.py
 
+      - name: Hook parity (duplicated frontmatter helpers agree)
+        run: python3 .github/scripts/test-hook-parity.py
+
       - name: Smoke-test the guardrail engine
         run: bash .github/scripts/test-engine.sh
 

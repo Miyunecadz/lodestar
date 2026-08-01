@@ -284,6 +284,45 @@ printf 'x\n' > "$WS/mobile/vendored/a.js"; git -C "$WS" add mobile/vendored/a.js
 expect "in-stack path blocks" 1
 unstage
 
+# --- stack scoping in the SEPARATE-SUB-REPOS layout (issue #28) -----------------------
+# The layout /lodestar-guardrails §6b explicitly supports: each repo is its own git repo
+# and `.claude/` lives in the parent workspace. `git diff --cached` reports paths relative
+# to the SUB-REPO's git root, but they were resolved against the workspace — naming a file
+# under no onboarded repo, so `stacks_for` returned None, `in_scope` failed protective, and
+# the rule fired with no scoping at all. A react-native rule could block a path in the web
+# repo. CATALOG.md promises the opposite: "a pack rule cannot fire in the wrong repo of a
+# mixed workspace."
+SEP="$WORK/separate"
+mkdir -p "$SEP/.claude/guardrails" "$SEP/web/vendored" "$SEP/mobile/vendored"
+cp "$WS/.claude/guardrails/mobile.md" "$SEP/.claude/guardrails/"
+cat > "$SEP/.claude/lodestar.manifest.json" <<'EOF'
+{"repos":[{"name":"web","path":"web","stacks":["react-craco"]},
+          {"name":"mobile","path":"mobile","stacks":["react-native"]}]}
+EOF
+for r in web mobile; do
+  git init -q "$SEP/$r"
+  git -C "$SEP/$r" config user.email ci@example.com
+  git -C "$SEP/$r" config user.name ci
+  git -C "$SEP/$r" symbolic-ref HEAD refs/heads/feature   # keep default-branch rules quiet
+done
+# Same relative path, `vendored/a.js`, staged in each repo. Only the react-native one
+# is in scope; before the fix both blocked, because neither resolved to a known repo.
+printf 'x\n' > "$SEP/web/vendored/a.js";    git -C "$SEP/web" add vendored/a.js
+printf 'x\n' > "$SEP/mobile/vendored/a.js"; git -C "$SEP/mobile" add vendored/a.js
+
+sep_check() { (cd "$SEP/$1" && LODESTAR_WORKSPACE="$SEP" "$PY" "$CHECK" 2>&1); }
+sep_expect() {  # sep_expect "<label>" <repo> <want-exit>
+  local out rc
+  set +e; out="$(sep_check "$2")"; rc=$?; set -e
+  if [ "$rc" != "$3" ]; then
+    echo "FAIL: $1 → exit $rc, want $3"; echo "$out" | head -8 | sed 's/^/    /'; fail=$((fail+1)); return
+  fi
+  echo "ok: $1 → exit $rc"; pass=$((pass+1))
+}
+sep_expect "separate repos: react-native rule does not fire in the web repo" web 0
+sep_expect "separate repos: the same rule does fire in the mobile repo" mobile 1
+unstage
+
 # --- --list reports the commit-surface rule set -------------------------------------
 set +e; listed="$(cd "$WS" && LODESTAR_WORKSPACE="$WS" "$PY" "$CHECK" --list)"; set -e
 for want in block-env-files block-secret-files block-edit-applied-migrations scan-secrets-before-commit; do
