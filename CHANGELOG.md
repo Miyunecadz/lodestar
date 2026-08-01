@@ -2,6 +2,29 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.13.0] — Unreleased
+
+`block-env-files` and `block-secret-files` are titled "block **reads** and writes". They did not block reads. The PreToolUse engine is registered for `Bash|Edit|Write|MultiEdit`, so a `Read` never reached it — the strongest-worded rules in the catalog were, on their headline claim, advisory. Closes #23.
+
+Rather than widen the hook, this adopts the mechanism Claude Code already has and Lodestar was not using. `permissions.deny` covers every tool, merges across settings scopes so a local file cannot loosen a project one, and has no interpreter that could fail open — the engine deliberately allows the action on an internal error, which is right for a hook and wrong for a secret.
+
+### Added
+- **`surface: permission`**, a third enforcement surface. `surface` now accepts a list (`[agent, commit, permission]`); the scalar `both` still means `[agent, commit]`, so rule files installed by an older version keep working untouched.
+- **`permission_rules`** frontmatter — the deny entries a rule contributes, in Claude Code's `Tool(pattern)` syntax. Written by hand, not derived: a regex does not translate to a gitignore-style glob, and a wrong automatic translation would either over-block committed templates or silently under-enforce. `validate.py` rejects a `permission` surface with no entries, and any entry that is not a well-formed `Tool(pattern)` rule.
+- **`kit/templates/hooks/lodestar-permissions.py`** — merges those entries into `.claude/settings.json`. Idempotent and reversible: it preserves hand-written deny entries and unrelated settings keys, never duplicates on a re-run, and when a rule is unticked or disabled removes exactly the entries that rule contributed. Ownership comes from `guardrailSurfaces.permission.entries` in the manifest, which is what makes the removal safe. `--list`, `--dry-run`, and `--check` (exit 1 when out of sync, for CI or a status check).
+- **`.github/scripts/test-permissions.sh`** (new CI gate, 21 checks) — the merge semantics above, plus both never-break paths.
+- Engine-test cases for surface filtering, and commit-checker cases for a list-valued surface.
+
+### Changed
+- **`block-env-files` and `block-secret-files` declare `[agent, commit, permission]`.** Reads of those paths are now denied outright.
+- **The engine skips a rule that does not declare the `agent` surface.** It previously ignored `surface` entirely and ran every rule it found — harmless while nothing declared a non-agent surface, wrong the moment a rule is permission-only, which would otherwise be enforced twice and reported twice.
+- Neither secrets rule drops its hook surface, and the reason is the design constraint worth knowing: a deny list is globs with no negation, so it cannot express `block-env-files`' "block `.env.local`, allow `.env.local.example`". Its `permission_rules` name only files that can never be a template — bare `.env` plus the common real tiers — and the precise regex keeps the write side. `block-secret-files` has no such carve-out, so its deny list mirrors its regex.
+
+### Upgrading
+Run `/lodestar-update`, then **re-run `/lodestar-guardrails`** — an update never edits your installed rules, so the two secrets rules keep their old `surface: both` until you re-tick them. The picker copies the new fields and runs the applier. To check afterwards: `python3 .claude/hooks/lodestar-permissions.py --check`.
+
+Using an env tier the shipped list does not name (`.env.staging`, `.env.qa`)? Add it to `permission_rules` in `.claude/guardrails/block-env-files.md` and re-run the applier; the write and commit surfaces already covered it through the regex.
+
 ## [0.12.0] — Unreleased
 
 Drift detection asked its question in the wrong repository. `mapping.lastMappedSha` is recorded from an onboarded repo's own HEAD, but the checker ran `git diff` in whatever directory it was invoked from — so it only ever worked when the workspace root *was* the git repo. In the separate-sub-repos layout that `ARCHITECTURE.md` §6 calls the default, the range could never resolve and every repo reported `that commit isn't in history`, drifted or not. Closes #21.

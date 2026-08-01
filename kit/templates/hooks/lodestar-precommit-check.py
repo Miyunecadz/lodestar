@@ -7,10 +7,14 @@ rule labelled "safety" was in practice enforced against one committer out of man
 script closes that gap: it runs as a **pre-commit hook** and applies the same rule files
 to the staged change, whoever is committing.
 
-    .claude/guardrails/*.md   ← one rule set, two enforcement surfaces
-      surface: agent   → PreToolUse only (lodestar-guardrails.py)
-      surface: commit  → pre-commit only (this script)
-      surface: both    → both
+    .claude/guardrails/*.md   ← one rule set, several enforcement surfaces
+      surface: agent       → PreToolUse only (lodestar-guardrails.py)
+      surface: commit      → pre-commit only (this script)
+      surface: permission  → settings.json permissions.deny (lodestar-permissions.py)
+      surface: both        → [agent, commit], the pre-permission spelling
+
+`surface` accepts a scalar or an inline list (`[agent, commit, permission]`). This
+script runs the `commit` half and ignores the rest.
 
 Usage (wired by /lodestar-guardrails into lefthook / husky / core.hooksPath / .git/hooks):
 
@@ -102,6 +106,18 @@ def as_list(val):
     return []
 
 
+def surfaces_of(fm):
+    """The set of enforcement mechanisms a rule declares. Mirrors the engine's copy."""
+    raw = fm.get("surface")
+    if raw is None:
+        return {"agent"}
+    names = {str(s).strip().lower() for s in as_list(raw) if str(s).strip()}
+    if "both" in names:
+        names.discard("both")
+        names |= {"agent", "commit"}
+    return names or {"agent"}
+
+
 def find_workspace(start="."):
     """Locate the Lodestar workspace holding the rules.
 
@@ -140,7 +156,7 @@ def load_commit_rules(workspace):
             continue
         if not fm or fm.get("enabled") is False:
             continue
-        if str(fm.get("surface", "agent")).lower() not in ("commit", "both"):
+        if "commit" not in surfaces_of(fm):
             continue
         check = fm.get("commit_check") or ("staged-paths" if fm.get("event") == "file" else "")
         if not check:

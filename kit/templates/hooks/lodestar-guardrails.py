@@ -24,12 +24,26 @@ per invocation:
 
     stacks: [react-native]        # skip unless the target repo's detected stacks match
     allow_if_untracked: true      # file rules: skip for a file git does not track yet
+    surface: [agent, permission]  # which mechanisms enforce this rule (see below)
     only_on_default_branch: true  # bash rules: fire only when HEAD is the default branch
     match: argv                   # bash rules: match shell words, not the raw string
     allow_paths: ['^/tmp/']       # bash rules: skip when every operand is under an allowed prefix
     ignore_case: false            # opt out of the default case-insensitive match
     requires_manifest_missing: k  # fire only while manifest key `k` is absent/false — a
                                   # reminder that silences itself once the gap is closed
+
+A rule also declares which mechanisms enforce it. This engine only ever runs the
+`agent` half; the others are listed so one rule file describes the whole picture:
+
+    agent       this PreToolUse hook — Claude's Bash/Edit/Write/MultiEdit calls
+    commit      lodestar-precommit-check.py — any committer, via pre-commit
+    permission  settings.json `permissions.deny` — Claude Code core, all tools
+                including Read, applied by lodestar-permissions.py
+
+`surface` accepts a scalar or an inline list; the legacy scalar `both` still means
+`[agent, commit]`. **A rule that does not include `agent` is skipped here** — before
+the permission surface existed nothing declared a non-agent surface, so this engine
+ignored the field entirely and ran every rule it found.
 
 Design notes:
 - stdlib only; never raises out of the hook — on any error it allows the action (exit 0).
@@ -100,6 +114,23 @@ def as_list(val):
     if isinstance(val, str):
         return [p.strip().strip('"').strip("'") for p in val.strip("[]").split(",") if p.strip()]
     return []
+
+
+def surfaces_of(fm: dict):
+    """The set of enforcement mechanisms a rule declares.
+
+    Scalar or list, defaulting to `agent`. `both` is the pre-permission-surface
+    spelling of `[agent, commit]` and stays valid so existing installed rule files
+    keep working across an update.
+    """
+    raw = fm.get("surface")
+    if raw is None:
+        return {"agent"}
+    names = {str(s).strip().lower() for s in as_list(raw) if str(s).strip()}
+    if "both" in names:
+        names.discard("both")
+        names |= {"agent", "commit"}
+    return names or {"agent"}
 
 
 def shell_words(command: str):
@@ -341,6 +372,8 @@ def load_rules(event: str):
             continue
         if not fm or fm.get("enabled") is False:
             continue
+        if "agent" not in surfaces_of(fm):
+            continue  # enforced elsewhere (commit hook, permissions.deny) — not here
         rule_event = fm.get("event", "all")
         if rule_event not in ("all", event):
             continue

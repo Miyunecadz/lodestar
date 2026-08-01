@@ -109,7 +109,10 @@ expect ".env.staging deny"        DENY  '{"tool_name":"Edit","tool_input":{"file
 expect "rm -rf deny"        DENY  '{"tool_name":"Bash","tool_input":{"command":"rm -rf build"}}'
 expect "git commit warn"    WARN  '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}'
 expect "ls allow"           ALLOW '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}'
-expect "Read tool allow"    ALLOW '{"tool_name":"Read","tool_input":{"file_path":"api/.env"}}'
+# The engine is registered for Bash|Edit|Write|MultiEdit, so a Read never reaches it.
+# That is why the secrets rules also declare `surface: permission` — the deny entries
+# in settings.json are what actually stop this, not the hook.
+expect "Read tool not seen by the engine" ALLOW '{"tool_name":"Read","tool_input":{"file_path":"api/.env"}}'
 
 # --- shell-aware matching: quoted text runs nothing (issue #11, finding 4) ---
 expect "rm -rf in quoted arg allow" ALLOW \
@@ -179,5 +182,48 @@ expect "non-UI file never warns"              ALLOW \
 rm -f "$WORK/.claude/lodestar.manifest.json"
 expect "no manifest → reminder still appears" WARN \
   "{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/ui/Button.tsx\"}}"
+
+# --- surface filtering: this engine runs the `agent` half and only that (issue #23) --
+# Before the permission surface existed nothing declared a non-agent surface, so the
+# engine ignored the field entirely. It now filters, or a permission-only rule would
+# be enforced twice and reported twice.
+rm -f "$WORK"/.claude/guardrails/*.md
+surface_rule() {  # surface_rule <file> <surface-value>
+  cat > "$WORK/.claude/guardrails/$1.md" <<EOF
+---
+name: $1
+enabled: true
+event: file
+pattern: 'surfaced\.txt$'
+severity: block
+surface: $2
+EOF
+  printf -- '---\nblocked.\n' >> "$WORK/.claude/guardrails/$1.md"
+}
+probe="{\"tool_name\":\"Edit\",\"cwd\":\"$WORK\",\"tool_input\":{\"file_path\":\"$WORK/surfaced.txt\"}}"
+
+surface_rule s-agent      "agent";                          expect "surface: agent runs here"            DENY  "$probe"
+rm -f "$WORK"/.claude/guardrails/*.md
+surface_rule s-both       "both";                           expect "surface: both still runs here"       DENY  "$probe"
+rm -f "$WORK"/.claude/guardrails/*.md
+surface_rule s-list       "[agent, commit, permission]";    expect "a list containing agent runs here"   DENY  "$probe"
+rm -f "$WORK"/.claude/guardrails/*.md
+surface_rule s-commit     "commit";                         expect "surface: commit is skipped here"     ALLOW "$probe"
+rm -f "$WORK"/.claude/guardrails/*.md
+surface_rule s-permission "permission";                     expect "surface: permission is skipped here" ALLOW "$probe"
+rm -f "$WORK"/.claude/guardrails/*.md
+surface_rule s-plist      "[commit, permission]";           expect "a list without agent is skipped"     ALLOW "$probe"
+rm -f "$WORK"/.claude/guardrails/*.md
+cat > "$WORK/.claude/guardrails/s-default.md" <<'EOF'
+---
+name: s-default
+enabled: true
+event: file
+pattern: 'surfaced\.txt$'
+severity: block
+---
+blocked.
+EOF
+expect "no surface field defaults to agent" DENY "$probe"
 
 echo "✅ engine smoke test passed"

@@ -62,9 +62,47 @@ The PreToolUse engine only fires when *Claude* is about to act. A teammate in th
 
 | `surface` | Enforced by | Holds for |
 |---|---|---|
-| `agent` | `.claude/hooks/lodestar-guardrails.py` (PreToolUse) | Claude tool-use only |
+| `agent` | `.claude/hooks/lodestar-guardrails.py` (PreToolUse) | Claude's `Bash`/`Edit`/`Write`/`MultiEdit` calls |
 | `commit` | `.claude/hooks/lodestar-precommit-check.py` (pre-commit) | any committer |
-| `both` | both hooks | everyone |
+| `permission` | Claude Code core, via `permissions.deny` in `settings.json` | Claude tool-use, **every tool including `Read`** |
+| `both` | both hooks | the legacy spelling of `[agent, commit]` |
+
+`surface` accepts a scalar or an inline list, so a rule can name several: `surface: [agent, commit, permission]`. `both` predates the permission surface and still means `[agent, commit]`, so rule files installed by an older version keep working.
+
+**A rule that does not include `agent` is skipped by the engine.** Before the permission surface existed, nothing declared a non-agent surface, so the engine ignored the field and ran every rule it found. It now filters — which matters the moment a rule is `permission`-only, since otherwise it would be enforced twice and reported twice.
+
+### `permission` — the strongest surface, where it fits
+
+`permissions.deny` beats a hook on three counts: it applies to **every tool** (a PreToolUse matcher can be extended to `Read`, but the deny list is there already), deny rules **merge across settings scopes** so a local file cannot loosen a project one, and there is **no interpreter to crash** — the engine deliberately allows the action on an internal error, which is correct for a hook and wrong for a secret.
+
+It is not a superset, though, and the difference decides what belongs there:
+
+| | Hook pattern | `permissions.deny` |
+|---|---|---|
+| Expressiveness | full regex, including negative lookahead | gitignore-style globs, no negation |
+| Context | branch, tracked status, repo stacks, shell words | none — static path matching |
+| Message | your redirect text | a generic denial |
+
+So a rule with an **exception** cannot be ported wholesale. `block-env-files` must allow `.env.local.example` while blocking `.env.local`; no deny glob expresses that, so its `permission_rules` name only files that can never be a template and the regex keeps the rest. `block-secret-files` has no such carve-out, so its deny list mirrors its regex.
+
+Because the translation is a judgement, the author writes it out:
+
+```yaml
+surface: [agent, commit, permission]
+permission_rules: [Read(./.env), Read(./**/.env)]
+```
+
+Each entry is a `Tool(pattern)` rule in Claude Code's own permission syntax; `validate.py` rejects anything that is not. Entries cannot contain a comma — frontmatter lists split on it.
+
+Applying them is a script, not a prose instruction, because the merge has to be idempotent and reversible:
+
+```bash
+python3 .claude/hooks/lodestar-permissions.py --dry-run   # plan
+python3 .claude/hooks/lodestar-permissions.py             # apply
+python3 .claude/hooks/lodestar-permissions.py --check     # exit 1 if out of sync (CI)
+```
+
+It preserves hand-written deny entries, never duplicates on a re-run, and when a rule is unticked removes exactly the entries that rule contributed — it knows which are its own from `guardrailSurfaces.permission.entries` in the manifest. Never hand-edit that key.
 
 A `commit`/`both` rule needs something the pre-commit checker can run — `commit_check`, or an `event: file` pattern (which defaults to `staged-paths`):
 
@@ -88,7 +126,7 @@ The commit surface must **never break an unrelated commit**: the checker exits 1
 
 Frontmatter parsing is deliberately minimal: scalars and inline lists (`[a, b]`) only. A regex containing a comma cannot go in a list value — use a single scalar pattern instead.
 
-`file` rules see the edited path; add `match: content` to test the edited text instead. Note the engine is registered for `Bash|Edit|Write|MultiEdit`, so a rule cannot intercept a `Read` — a rule body promising "never read this" is documenting intent for the model, not enforcing it.
+`file` rules see the edited path; add `match: content` to test the edited text instead. The engine is registered for `Bash|Edit|Write|MultiEdit`, so a **hook** rule still cannot intercept a `Read` — a rule body promising "never read this" needs the `permission` surface above to be an enforced stop rather than a note to the model.
 
 ## Add an agent role
 

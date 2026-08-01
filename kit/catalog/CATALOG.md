@@ -12,12 +12,17 @@ Totals: **50 entries** — 18 universal · 15 Node·GraphQL·React·RN·frontend
 
 A guardrail is only as universal as the hook that enforces it. Every entry declares a `surface`:
 
-| `surface` | Hook | Holds for |
+| `surface` | Enforced by | Holds for |
 |---|---|---|
-| `agent` | `lodestar-guardrails.py` (PreToolUse) | Claude tool-use only |
+| `agent` | `lodestar-guardrails.py` (PreToolUse) | Claude's `Bash`/`Edit`/`Write`/`MultiEdit` |
 | `commit` / `both` | `lodestar-precommit-check.py` (pre-commit) | **any committer** — teammate, IDE, CI |
+| `permission` | Claude Code core, via `permissions.deny` | Claude tool-use, **every tool including `Read`** |
 
-**Commit-surface entries** (`both`): `block-env-files` · `block-secret-files` · `block-edit-applied-migrations` · `block-edit-applied-migrations-django` · `block-commit-to-default-branch` · `scan-secrets-before-commit`. Installed into the repo's git-hook manager by `/lodestar-guardrails`.
+An entry may name several (`surface: [agent, commit, permission]`); `both` is the legacy spelling of `[agent, commit]`.
+
+**Commit-surface entries**: `block-env-files` · `block-secret-files` · `block-edit-applied-migrations` · `block-edit-applied-migrations-django` · `block-commit-to-default-branch` · `scan-secrets-before-commit`. Installed into the repo's git-hook manager by `/lodestar-guardrails`.
+
+**Permission-surface entries**: `block-env-files` · `block-secret-files` — the two rules whose titles promise "never **read** this", which a hook cannot deliver. Applied to `.claude/settings.json` by `lodestar-permissions.py`. Neither drops its hook surface: a deny glob has no negation, so it cannot express `block-env-files`' "allow `.env.local.example`" carve-out, and the precise regex stays responsible for the write side.
 
 Everything else is `agent`-only, each for a stated reason in its body — usually that legitimate tooling commits those files (`yarn.lock`, `db/schema.sql`, and the freshness hook's own `graph.json`), so a commit-time block would stop correct work. See [`docs/EXTENDING.md`](../../docs/EXTENDING.md).
 
@@ -28,8 +33,8 @@ Everything else is `agent`-only, each for a stated reason in its body — usuall
 | guardrail | `block-destructive-commands` | block irreversible shell commands (`rm -rf`, `reset --hard`, `DROP …`) |
 | guardrail | `protect-default-branch` | block bare `git push --force` on any branch |
 | guardrail | `block-commit-to-default-branch` | block committing/pushing while on trunk (branch-aware) |
-| guardrail | `block-env-files` | block reading/writing real `.env*` files (secrets) |
-| guardrail | `block-secret-files` | block reading/writing private keys & credential files |
+| guardrail | `block-env-files` | block writes to real `.env*` files; **deny reads** of them via `permissions.deny` |
+| guardrail | `block-secret-files` | block writes to private keys & credential files; **deny reads** of them via `permissions.deny` |
 | guardrail | `scan-secrets-before-commit` | remind to scan the staged diff for hardcoded secrets |
 | guardrail | `no-hand-edit-lockfiles` | block hand-edits to lockfiles across JS/Python/Rust/Go/Ruby/PHP |
 | guardrail | `protect-generated-files` | block edits to generated/binary artifacts |
@@ -129,6 +134,7 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 | `templates/hooks/lodestar-freshness-check.py` | offline drift detector for architecture maps (`/lodestar-freshness`, `/lodestar-refresh`) |
 | `templates/hooks/lodestar-precommit-check.py` | commit-surface guardrail enforcement for any committer (`/lodestar-guardrails`) |
 | `templates/hooks/lodestar-graph-coverage.py` | graph **completeness** assertion: on-disk code vs graph nodes (`/lodestar-onboard`, `/lodestar-refresh`) |
+| `templates/hooks/lodestar-permissions.py` | permission surface: merges rule `permission_rules` into `settings.json` `permissions.deny` (`/lodestar-guardrails`) |
 | `templates/git/gitattributes-graphify` | union-merge `.gitattributes` for `graph.json` (`/lodestar-freshness`) |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 

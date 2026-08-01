@@ -57,20 +57,39 @@ Rules can also opt into a **context layer** the engine computes per invocation (
 ## 5. Write the selected rules — into the `.claude/guardrails/` folder
 For each chosen entry:
 - If `emits: rule`: write `.claude/guardrails/<id>.md` with frontmatter `name: <id>`, `enabled: true`, `event`, `pattern`, `severity` (`block`/`warn`), and the message body from the catalog entry — copied verbatim (a `block` message must redirect to the correct alternative, not just deny). Keeping one rule per file in this folder is the whole point: `.claude/` root stays clean.
-  - **Copy the catalog entry's `stacks`, context flags, and surface fields too** — `stacks`, `allow_if_untracked`, `only_on_default_branch`, `match`, `allow_paths`, `ignore_case`, `surface`, `commit_check`, `commit_severity`. These are what the engine's context layer reads; a rule installed without them silently loses its scoping and fires everywhere. Copy the values verbatim, including list syntax (`stacks: [react-native]`).
+  - **Copy the catalog entry's `stacks`, context flags, and surface fields too** — `stacks`, `allow_if_untracked`, `only_on_default_branch`, `match`, `allow_paths`, `ignore_case`, `surface`, `permission_rules`, `commit_check`, `commit_severity`. These are what the engine's context layer reads; a rule installed without them silently loses its scoping and fires everywhere. Copy the values verbatim, including list syntax (`stacks: [react-native]`, `surface: [agent, commit, permission]`).
 - If `emits: settings-hook`: add the corresponding hook to `.claude/settings.json` directly (e.g. a per-repo lint **router** that must run a linter after an edit — that needs shell logic the declarative engine doesn't do). This is the only case that still writes into `settings.json` beyond the engine registration above.
 
 Never write secrets into any rule file — they hold patterns and guidance only, and are safe to commit and share.
+
+## 5b. Apply the permission surface (automatic — no prompt needed)
+
+A rule may declare `surface: permission`, meaning some of what it forbids is enforced by Claude Code's own `permissions.deny` in `.claude/settings.json` rather than by a hook. That mechanism is stronger where it applies: it covers **every tool including `Read`** (which the PreToolUse engine cannot intercept), deny rules merge across settings scopes so a local file cannot loosen a project one, and there is no interpreter that could fail open.
+
+Do not hand-edit `settings.json` for this. Run the shipped applier, which is idempotent and reversible:
+
+```bash
+cp .lodestar/templates/hooks/lodestar-permissions.py .claude/hooks/lodestar-permissions.py
+python3 .claude/hooks/lodestar-permissions.py --dry-run    # show the plan
+python3 .claude/hooks/lodestar-permissions.py              # apply
+```
+
+It reads the same `.claude/guardrails/*.md` files, collects `permission_rules` from every enabled rule on the permission surface, and merges them into `permissions.deny` — preserving entries the user wrote by hand, never duplicating on a re-run, and removing exactly the entries a now-unticked rule had contributed. Ownership is tracked in the manifest under `guardrailSurfaces.permission.entries`, which is what makes the removal safe.
+
+Report the entry count and say plainly what it bought: reads of those paths are now blocked outright, not merely discouraged.
 
 ## 6. Install the commit surface (opt-in — this is what covers non-Claude commits)
 
 The engine from §4 is a **PreToolUse** hook: it only fires when *Claude* is about to act. A teammate editing in their IDE, or CI, never touches that path — so a rule labelled "safety" is, by itself, enforced against one committer out of many. Rules that must hold for **any** committer declare it in frontmatter:
 
-| `surface` | Where it holds |
-|---|---|
-| `agent` | Claude tool-use only (the PreToolUse engine) |
-| `commit` | any committer (the pre-commit checker) |
-| `both` | both surfaces |
+| `surface` | Where it holds | Enforced by |
+|---|---|---|
+| `agent` | Claude tool-use (Bash/Edit/Write/MultiEdit) | the PreToolUse engine |
+| `commit` | any committer | the pre-commit checker |
+| `permission` | Claude tool-use, **every tool including `Read`** | Claude Code core, via `permissions.deny` |
+| `both` | the legacy spelling of `[agent, commit]` | both of those |
+
+`surface` accepts a list, so a rule can name several (`surface: [agent, commit, permission]`) — which is what the secrets rules do, because no single mechanism covers all of what they forbid.
 
 If any selected rule has `surface: commit` or `both`, offer to install the commit surface (AskUserQuestion, recommended). Be honest about the trade: it holds for everyone, and `git commit --no-verify` remains a deliberate bypass. If the user declines, say plainly which rules therefore hold **for Claude only** — that is the false-sense-of-security this step exists to remove.
 
@@ -96,5 +115,5 @@ Confirm the detected manager with the user before writing. In a **separate sub-r
 
 ## 7. Update the manifest & report
 - Set `.claude/lodestar.manifest.json` `guardrails` to the enabled ids.
-- If the commit surface was installed, record it: `"guardrailSurfaces": { "commit": { "hookManager": "lefthook|husky|hooksPath|git-hooks", "rules": [ ...ids... ] } }`.
+- If the commit surface was installed, record it: `"guardrailSurfaces": { "commit": { "hookManager": "lefthook|husky|hooksPath|git-hooks", "rules": [ ...ids... ] } }`. The permission applier writes its own `guardrailSurfaces.permission` record — do not edit that key by hand, or the next run will lose track of which deny entries are Lodestar's.
 - Report what was enabled, grouped by block vs warn, **and by surface** — make explicit which rules hold for every committer and which are Claude-only. Note that rules live in `.claude/guardrails/` enforced by `.claude/hooks/lodestar-guardrails.py` (agent) and `.claude/hooks/lodestar-precommit-check.py` (commit). Explain how to disable one: set `enabled: false` in its `.claude/guardrails/<id>.md` (or delete the file), or re-run this command and untick it. Changes take effect on the next tool call — no restart.

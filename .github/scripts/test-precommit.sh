@@ -88,6 +88,31 @@ stacks: [react-native]
 ---
 Stack-scoped: only applies to react-native repos.
 EOF
+# `surface` may be a list now. This checker takes the `commit` member and ignores the
+# rest; `both` above is the legacy spelling of [agent, commit] and must keep working.
+w listed-surface.md <<'EOF'
+---
+name: listed-surface-rule
+enabled: true
+event: file
+pattern: '(^|/)listed-surface\.txt$'
+severity: block
+surface: [agent, commit, permission]
+---
+A rule naming several surfaces is still enforced at commit time.
+EOF
+w permission-only.md <<'EOF'
+---
+name: permission-only-rule
+enabled: true
+event: file
+pattern: '(^|/)permission-only\.txt$'
+severity: block
+surface: [permission]
+permission_rules: [Read(./permission-only.txt)]
+---
+Enforced by permissions.deny, not by this hook.
+EOF
 
 pass=0; fail=0
 run_check() { (cd "${2:-$WS}" && LODESTAR_WORKSPACE="$WS" python3 "$CHECK" 2>&1); }
@@ -178,6 +203,12 @@ done
 if printf '%s' "$listed" | grep -q "no-hand-edit-lockfiles"; then
   echo "FAIL: --list leaked an agent-only rule"; fail=$((fail+1))
 else echo "ok: --list excludes agent-only rules"; pass=$((pass+1)); fi
+if printf '%s' "$listed" | grep -q "listed-surface-rule"; then
+  echo "ok: --list includes a rule whose surface list contains commit"; pass=$((pass+1))
+else echo "FAIL: --list dropped a list-valued commit surface"; fail=$((fail+1)); fi
+if printf '%s' "$listed" | grep -q "permission-only-rule"; then
+  echo "FAIL: --list leaked a permission-only rule"; fail=$((fail+1))
+else echo "ok: --list excludes permission-only rules"; pass=$((pass+1)); fi
 
 # --- degrade, never break a commit --------------------------------------------------
 printf 'API_KEY=live\n' > "$WS/.env"; git -C "$WS" add -f .env   # a real violation is staged
