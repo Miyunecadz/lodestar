@@ -12,8 +12,30 @@ Everything in Lodestar is a plain file. Adding capability means adding a catalog
    - `stacks:` — which stacks it applies to, or `[all]`.
    - `event` + `pattern` — the engine trigger (`file` events match the edited path; `bash` events match the command).
    - `emits: rule` for declarative rules (enforced by the bundled engine); `emits: settings-hook` only if it needs custom shell logic.
-3. Write a message body that **redirects to the right action**, not just "denied."
+3. Write a message body that **redirects to the right action**, not just "denied." Put the redirect first, then a bare `---` line, then the design rationale — see below.
 4. Re-run `/lodestar-guardrails` and tick your new rule.
+
+### The `---` split: redirect above, rationale below
+
+A rule file has two readers with opposite needs. The model wants the redirect — what to do instead — and nothing else. A person opening the catalog wants the reasoning: why this surface, how the matcher works, what the rule deliberately does not cover. Both belong in the file; only the first belongs in the message.
+
+A bare `---` line separates them. Everything above it is sent when the rule fires; everything below stays in the file for whoever reads it:
+
+```markdown
+Applied migrations are immutable — create a NEW migration with `yarn db:new <name>`
+and write your forward/rollback SQL there.
+
+---
+
+**Surface: `both`.** Also enforced for every committer: staging a modification to a
+migration git already tracks blocks the commit, while adding a new one is allowed.
+```
+
+The test for what goes above: **would the model need this to take the right next action?** Design notes, surface justifications, and matcher internals fail it. So does anything describing when the rule *doesn't* fire — an `allow_if_untracked` paragraph explains a case the model never sees, because the rule stayed silent.
+
+`validate.py` caps the block-time payload at **900 characters**. That is a ceiling, not a target; the shipped rules run 223–829. A rule with no separator sends its whole body, so older and hand-written rule files keep working unchanged.
+
+Both fields the engine emits on a block carry different payloads, because they have different readers: `permissionDecisionReason` goes to the model and carries the redirect; `systemMessage` goes to the **user** and is a one-line "Lodestar blocked this — `<rule>`". Sending the same body to both was pure duplication; sending only one would leave the user with an unexplained block.
 
 Example — block committing directly to `main`:
 

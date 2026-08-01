@@ -13,4 +13,6 @@ emits: rule
 
 Lockfiles are machine-generated; hand-edits produce inconsistent, unresolvable dependency trees. Change dependencies via the package manager and let it rewrite the lockfile for you — e.g. `yarn add` / `npm install` / `pnpm add` (JS), `poetry add` / `pipenv install` (Python), `cargo add` (Rust), `go get` (Go), `bundle add` (Ruby), `composer require` (PHP).
 
+---
+
 **Surface: `agent` only.** Lockfiles are committed constantly by legitimate `yarn add` / `poetry add` runs, and a pre-commit hook cannot distinguish a package-manager rewrite from a hand-edit. Enforcing at commit time would block ordinary dependency work.

@@ -117,6 +117,25 @@ def coerce(val: str):
     return val
 
 
+def redirect_of(body):
+    """The part of a rule body that goes to the model when the rule fires.
+
+    A rule file is written for two readers. The model needs the redirect — what to do
+    instead — and nothing else. A human opening the file wants the design rationale:
+    why this surface, how the matching works, what the rule deliberately does not cover.
+    A bare `---` line separates them; everything above it is the redirect.
+
+    Both halves stay in the file, so the rationale is still there for whoever reads it.
+    A rule with no separator sends its whole body, which is what every rule did before
+    this existed — an older or hand-written rule file keeps working unchanged.
+    """
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == "---":
+            return "\n".join(lines[:i]).strip()
+    return body.strip()
+
+
 def parse_frontmatter(text: str):
     """Minimal YAML frontmatter parser — scalars and inline lists. Returns (dict, body)."""
     if not text.startswith("---"):
@@ -419,7 +438,7 @@ def load_rules(event: str):
                 continue
             if not fm.get("pattern"):
                 continue
-            out.append(dict(fm, _message=body))
+            out.append(dict(fm, _message=redirect_of(body)))
         except Exception:
             failed += 1  # a broken rule must never take the rest of the set down
             continue
@@ -545,14 +564,22 @@ def main():
         (blocking if severity == "block" else warning).append(rule)
 
     if blocking:
+        # The two fields have different readers, so they carry different payloads.
+        # `permissionDecisionReason` goes to the model — it gets the full redirect,
+        # because that is what it must act on, and it is where the token cost lands.
+        # `systemMessage` goes to the *user*, who needs to know what stopped them and
+        # not a wall of instructions addressed to someone else. Sending the same body
+        # to both was the duplication; sending only one would leave the user with an
+        # unexplained block.
         msg = "\n\n".join(f"**[{r.get('name','rule')}]**\n{r['_message']}" for r in blocking)
+        names = ", ".join(str(r.get("name", "rule")) for r in blocking)
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": hook_event,
                 "permissionDecision": "deny",
                 "permissionDecisionReason": msg,
             },
-            "systemMessage": msg,
+            "systemMessage": "Lodestar blocked this action — %s. See Claude's redirect above." % names,
         }))
     elif warning:
         msg = "\n\n".join(f"**[{r.get('name','rule')}]**\n{r['_message']}" for r in warning)

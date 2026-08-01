@@ -267,6 +267,48 @@ blocked.
 EOF
 expect "no surface field defaults to agent" DENY "$probe"
 
+# --- the block payload stops at the rationale separator (issue #30) ---
+rm -f "$WORK"/.claude/guardrails/*.md
+cat > "$WORK/.claude/guardrails/split.md" <<'EOF'
+---
+name: split-rule
+enabled: true
+event: file
+pattern: 'surfaced\.txt$'
+severity: block
+---
+REDIRECT: do this instead.
+
+---
+
+RATIONALE: why this rule chose its surface, how the matcher works, and what it
+deliberately does not cover. Written for whoever opens the file, not for the model.
+EOF
+emit() { printf '%s' "$probe" | "$PY" "$ENGINE"; }
+reason() { emit | python3 -c 'import sys,json;print(json.load(sys.stdin).get("hookSpecificOutput",{}).get("permissionDecisionReason",""))'; }
+usermsg() { emit | python3 -c 'import sys,json;print(json.load(sys.stdin).get("systemMessage",""))'; }
+
+if reason | grep -q "REDIRECT"; then echo "ok: the redirect reaches the model"; else echo "FAIL: redirect missing"; exit 1; fi
+if reason | grep -q "RATIONALE"; then echo "FAIL: rationale leaked into the block payload"; exit 1; else echo "ok: rationale stays out of the block payload"; fi
+# The user still gets told what happened — the two fields have different readers, so
+# dropping systemMessage entirely would leave a block with no user-facing explanation.
+if usermsg | grep -q "split-rule"; then echo "ok: the user is told which rule fired"; else echo "FAIL: user message does not name the rule"; exit 1; fi
+if [ "$(usermsg | wc -c)" -lt 200 ]; then echo "ok: the user message is a one-liner, not a second copy"; else echo "FAIL: user message is not compact"; exit 1; fi
+
+# A rule with no separator sends its whole body, exactly as before the split existed.
+rm -f "$WORK"/.claude/guardrails/*.md
+cat > "$WORK/.claude/guardrails/unsplit.md" <<'EOF'
+---
+name: unsplit-rule
+enabled: true
+event: file
+pattern: 'surfaced\.txt$'
+severity: block
+---
+WHOLE BODY, no separator anywhere in here.
+EOF
+if reason | grep -q "WHOLE BODY"; then echo "ok: an unsplit rule still sends its full body"; else echo "FAIL: unsplit rule lost its body"; exit 1; fi
+
 # --- a failed rule set must be loud, not silently empty (issue #29) ---
 # The 3.8 dict-union bug made load_rules raise for *every* file. The engine caught it,
 # exited 0 with no decision, and the action proceeded: fail-protective for one rule had

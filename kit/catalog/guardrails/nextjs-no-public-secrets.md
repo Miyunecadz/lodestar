@@ -18,4 +18,6 @@ If this value is genuinely secret, drop the prefix and read it **server-side onl
 
 Some `NEXT_PUBLIC_` keys are legitimately public — a Stripe *publishable* key, a Mapbox public token, a public analytics id — which is why this **warns** rather than blocks: the name pattern cannot tell a publishable key from a secret one. Confirm which you have; if it is publishable, say so and continue.
 
+---
+
 **Surface: `agent`** — it matches edited *content*, and the commit-surface checker inspects staged paths and diffs rather than re-running content rules. [[block-env-files]] and [[scan-secrets-before-commit]] cover the commit path for real credentials.

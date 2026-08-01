@@ -135,6 +135,21 @@ def surfaces_of(fm):
     return names or {"agent"}
 
 
+def redirect_of(body):
+    """The part of a rule body shown when the rule fires. Mirrors the engine's copy.
+
+    A bare `---` line separates the redirect from the design rationale below it. Both
+    stay in the file; only the redirect is printed, because a blocked committer needs
+    the fix and not a paragraph on why the rule chose its enforcement surface. A rule
+    with no separator prints its whole body, as every rule did before the split.
+    """
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == "---":
+            return "\n".join(lines[:i]).strip()
+    return body.strip()
+
+
 def find_workspace(start="."):
     """Locate the Lodestar workspace holding the rules.
 
@@ -179,7 +194,7 @@ def load_commit_rules(workspace):
         if not check:
             continue  # a bash rule with no commit-side equivalent
         fm["_check"] = check
-        fm["_message"] = body
+        fm["_message"] = redirect_of(body)
         fm["_severity"] = str(fm.get("commit_severity") or fm.get("severity") or "warn").lower()
         out.append(fm)
     return out

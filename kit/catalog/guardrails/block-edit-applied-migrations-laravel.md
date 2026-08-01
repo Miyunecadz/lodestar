@@ -20,4 +20,6 @@ php artisan make:migration <describe_the_change>
 
 Write both `up()` and `down()` there, then update the model (`$fillable`, `$casts`, relationships) to match.
 
+---
+
 Editing the migration `make:migration` just scaffolded is allowed: `allow_if_untracked: true` means this rule only fires for migrations git already tracks (tracked stands in for "has run", which cannot be detected offline). Once committed it is protected. **Surface: `both`** — also enforced for every committer, so staging a modification to a committed migration blocks the commit while adding a new one does not. Sibling of [[block-edit-applied-migrations-django]] and [[block-edit-applied-migrations]] (dbmate).
