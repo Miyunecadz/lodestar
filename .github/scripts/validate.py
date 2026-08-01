@@ -36,6 +36,26 @@ def frontmatter(path):
     return fm
 
 
+VALID_SURFACES = ("agent", "commit", "permission")
+
+
+def surfaces_of(value):
+    """Frontmatter `surface` → the set of mechanisms it names.
+
+    Accepts a scalar or an inline list. `both` is the pre-permission-surface spelling
+    of `[agent, commit]` and stays valid, so installed rule files keep working.
+    """
+    raw = (value or "").strip()
+    if raw.startswith("[") and raw.endswith("]"):
+        names = {p.strip().strip('"').strip("'").lower() for p in raw[1:-1].split(",") if p.strip()}
+    else:
+        names = {raw.lower()} if raw else set()
+    if "both" in names:
+        names.discard("both")
+        names |= {"agent", "commit"}
+    return names
+
+
 def check_guardrails():
     for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
         rel = os.path.relpath(path, ROOT)
@@ -49,11 +69,30 @@ def check_guardrails():
             errors.append(f"{rel}: event must be file|bash|all (got {fm.get('event')!r})")
         if fm.get("emits") not in ("rule", "settings-hook"):
             errors.append(f"{rel}: emits must be rule|settings-hook (got {fm.get('emits')!r})")
-        if fm.get("surface") not in ("agent", "commit", "both"):
-            errors.append(f"{rel}: surface must be agent|commit|both (got {fm.get('surface')!r})")
+        surfaces = surfaces_of(fm.get("surface"))
+        if not surfaces:
+            errors.append(f"{rel}: missing frontmatter key 'surface'")
+        unknown = sorted(surfaces - set(VALID_SURFACES))
+        if unknown:
+            errors.append(
+                f"{rel}: unknown surface(s) {unknown} — valid are "
+                f"{list(VALID_SURFACES)} or the legacy scalar 'both'")
+        # A permission-surface rule needs the deny entries spelled out: a regex does
+        # not translate to a gitignore-style glob, so the author states both forms.
+        if "permission" in surfaces:
+            entries = fm.get("permission_rules", "").strip()
+            parsed = [p.strip().strip('"').strip("'")
+                      for p in entries.strip("[]").split(",") if p.strip()]
+            if not parsed:
+                errors.append(f"{rel}: surface 'permission' needs a non-empty permission_rules list")
+            for entry in parsed:
+                if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*\(.+\)", entry):
+                    errors.append(
+                        f"{rel}: permission_rules entry {entry!r} is not a Tool(pattern) rule "
+                        f"(e.g. 'Read(./.env)')")
         # A commit-surface rule needs something the pre-commit checker can actually run:
         # a `file` pattern (checked against staged paths) or a named built-in check.
-        if fm.get("surface") in ("commit", "both"):
+        if "commit" in surfaces:
             check = fm.get("commit_check") or ("staged-paths" if fm.get("event") == "file" else None)
             if check not in ("staged-paths", "secret-scan", "default-branch"):
                 errors.append(
