@@ -1,0 +1,61 @@
+{
+  "$comment": "Lodestar's own dev config. Never shipped \u2014 install.sh only copies from kit/. This repo dogfoods its own guardrail engine: rules live in .claude/guardrails/, and permissions.deny is merged by .claude/hooks/lodestar-permissions.py (do not hand-edit entries it owns).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-guardrails.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dev-validate-catalog.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dev-shellcheck.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python3 .github/scripts/validate.py)",
+      "Bash(bash .github/scripts/test-engine.sh)",
+      "Bash(bash .github/scripts/test-install.sh)",
+      "Bash(bash .github/scripts/test-precommit.sh)",
+      "Bash(bash .github/scripts/test-coverage.sh)",
+      "Bash(bash .github/scripts/test-freshness.sh)",
+      "Bash(bash .github/scripts/test-permissions.sh)",
+      "Bash(shellcheck:*)",
+      "Bash(python3 .claude/hooks/lodestar-permissions.py:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh issue:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./**/.env)",
+      "Read(./.env.local)",
+      "Read(./**/.env.local)",
+      "Read(./.env.development)",
+      "Read(./**/.env.development)",
+      "Read(./.env.production)",
+      "Read(./**/.env.production)"
+    ]
+  }
+}
