@@ -2,6 +2,26 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.17.0] — Unreleased
+
+The pre-commit checker resolved staged file paths against the **workspace**, but `git diff --cached` reports them relative to the **committing repo's git root**. In the separate-sub-repos layout — each repo its own git repo, `.claude/` in the parent — the two differ, so every staged path resolved to a file under no onboarded repo. `stacks_for` returned `None`, `in_scope` failed protective and returned `True`, and stack-scoped rules fired **with no scoping at all**. Closes #28.
+
+`CATALOG.md` states that "the guardrail engine re-checks `stacks` at match time so a pack rule cannot fire in the wrong repo of a mixed workspace." On the commit surface, in a layout `/lodestar-guardrails` §6b explicitly supports, it could — a `react-native` rule blocking a path in the web repo. Note the failure direction: failing protective is right for one unknown path and wrong as a steady state, because it converts a scoped rule into an unscoped one with no signal that it happened.
+
+### Fixed
+- **Staged paths resolve against `git rev-parse --show-toplevel`**, manifest repo paths against the workspace. Identical behaviour in a monorepo, where the two roots are the same directory. With no git root available it falls back to the workspace — fail protective, and no worse than before.
+- **`--verbose` prints both roots**, since "which root is this resolving against" is the first question when scoping misbehaves.
+
+### Added
+- **`test-hook-parity.py`** (new CI gate, 66 comparisons) — feeds one corpus of frontmatter through `parse_frontmatter`, `coerce`, `as_list`, and `surfaces_of` in **all three** hooks and fails when they disagree.
+- **A mixed-stack separate-sub-repos fixture** in `test-precommit.sh`: the same relative path staged in two sibling git repos, asserting a `react-native` rule fires in the mobile repo and not in the web one. Verified to fail against the pre-fix checker.
+
+### Changed
+- **`docs/EXTENDING.md`** gains a "two roots, and which one resolves what" table on the commit surface, and states the duplication policy explicitly next to the parser docs.
+
+### Note on the proposed fix
+The issue also proposed extracting the shared frontmatter helpers into one module both hooks import. That is declined: `.claude/skills/hook-engine-invariants` requires each hook to work when copied into `.claude/hooks/` alone, and the duplication is deliberate. Inspecting the actual drift showed the parsers are **behaviourally identical** and differ only in style — `stacks_for` and `default_branch` differ in shape because the engine caches context in an object across one invocation while the commit hook is a one-shot process, which a shared module would not have unified anyway. `test-hook-parity.py` gets the property the extraction was after — the next divergence cannot be silent — without trading away the self-contained-file invariant.
+
 ## [0.16.0] — Unreleased
 
 Four small hardening fixes. Individually minor; together they close the gaps where a shipped file is unbounded, unparseable, or unlinted. Closes #31, #35, #38, #34.

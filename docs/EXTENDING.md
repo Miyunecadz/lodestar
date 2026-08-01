@@ -155,7 +155,20 @@ A rule that reminds rather than forbids should silence itself. Without `requires
 
 The commit surface must **never break an unrelated commit**: the checker exits 1 only on a `block` match, and a missing tool, unreadable manifest, invalid regex, or internal error all exit 0. `git commit --no-verify` stays the documented bypass — which is also why a commit hook is not a substitute for server-side branch protection against a determined committer.
 
+#### Two roots, and which one resolves what
+
+On the commit surface there are two directories that are the same in a monorepo and different in the separate-sub-repos layout (each repo its own git repo, `.claude/` in the parent — the layout `/lodestar-guardrails` §6b explicitly supports). Conflating them is how `stacks` scoping silently stopped working there:
+
+| Root | Found by | Resolves |
+|---|---|---|
+| **git root** — the repo being committed | `git rev-parse --show-toplevel` | staged paths, which `git diff --cached` reports relative to *it* |
+| **workspace** — where `.claude/` lives | walk up for `.claude/guardrails`, or `$LODESTAR_WORKSPACE` | manifest `repos[].path`, and the rule files themselves |
+
+Resolving a staged path against the workspace names a file that exists under no onboarded repo. `stacks_for` then returns `None`, `in_scope` fails protective and returns `True`, and the rule fires **with no scoping at all** — a `python-django` rule matching `migrations/.*\.py$` could block a staged path in a Node repo, against `CATALOG.md`'s promise that a pack rule cannot fire in the wrong repo of a mixed workspace. Note the failure direction: the protective default is right for one unknown path and wrong as a steady state, because it turns a scoped rule into an unscoped one without any signal.
+
 Frontmatter parsing is deliberately minimal: scalars and inline lists (`[a, b]`) only. A regex containing a comma cannot go in a list value — use a single scalar pattern instead.
+
+The parser, `coerce`, `as_list`, and `surfaces_of` are **duplicated across all three hooks on purpose** — each must work when copied into `.claude/hooks/` alone, with no shared module to import. The cost of that is exactly the bug above: one rule file, two parsers, scoped differently by each. `test-hook-parity.py` is what keeps the cost bounded — it feeds one corpus through every hook's copy and fails when they disagree. When you change one, change them all and let that gate confirm it; do not extract a shared module.
 
 `file` rules see the edited path; add `match: content` to test the edited text instead. The engine is registered for `Bash|Edit|Write|MultiEdit`, so a **hook** rule still cannot intercept a `Read` — a rule body promising "never read this" needs the `permission` surface above to be an enforced stop rather than a note to the model.
 

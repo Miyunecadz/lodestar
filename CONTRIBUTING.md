@@ -57,11 +57,12 @@ skill), a template, or a stack detector. Everything is plain Markdown; no code c
 
 ## Before you push
 
-CI runs nine gates (see `.github/workflows/ci.yml`); run them locally:
+CI runs ten gates (see `.github/workflows/ci.yml`); run them locally:
 
 ```bash
 find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck --severity=error
 python3 .github/scripts/validate.py          # catalog frontmatter + VERSION↔CHANGELOG
+python3 .github/scripts/test-hook-parity.py  # the duplicated hook helpers still agree
 bash   .github/scripts/test-engine.sh        # guardrail engine (agent surface)
 bash   .github/scripts/test-install.sh       # installer: clone, bootstrap, pinning, refusals
 bash   .github/scripts/test-precommit.sh     # commit surface: staged-diff enforcement

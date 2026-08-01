@@ -188,6 +188,21 @@ def load_commit_rules(workspace):
 # ---------------------------------------------------------------- git context
 
 
+def git_root():
+    """Absolute path of the repository being committed, or None.
+
+    Not the same thing as the workspace. `git diff --cached` reports paths relative to
+    THIS, while manifest repo paths are relative to the workspace — and in the
+    separate-sub-repos layout (each repo its own git repo, `.claude/` in the parent)
+    the two differ. Resolving a staged path against the wrong one names a file that
+    exists under no onboarded repo, which silently disables stack scoping.
+    """
+    rc, out = run(["git", "rev-parse", "--show-toplevel"])
+    if rc == 0 and out.strip():
+        return os.path.abspath(out.strip())
+    return None
+
+
 def staged_files():
     """[(status, path)] for the staged change. Renames report their destination."""
     rc, out = run(["git", "diff", "--cached", "--name-status", "--diff-filter=ACMR"])
@@ -266,8 +281,13 @@ def in_scope(rule, path, workspace, repos):
 # ---------------------------------------------------------------- checks
 
 
-def check_staged_paths(rule, staged, workspace, repos):
-    """Rule pattern vs the staged paths — the commit-time twin of a `file` rule."""
+def check_staged_paths(rule, staged, repo_root, workspace, repos):
+    """Rule pattern vs the staged paths — the commit-time twin of a `file` rule.
+
+    `repo_root` resolves the staged paths (they come from `git diff --cached`, relative
+    to the committing repo); `workspace` resolves the manifest's repo paths. They are the
+    same directory in a monorepo and different ones in the separate-sub-repos layout.
+    """
     flags = 0 if rule.get("ignore_case") is False else re.IGNORECASE
     hits = []
     for status, path in staged:
@@ -280,7 +300,7 @@ def check_staged_paths(rule, staged, workspace, repos):
         # commit time that is exactly an addition: A = new here, M = already committed.
         if rule.get("allow_if_untracked") is True and status == "A":
             continue
-        if not in_scope(rule, os.path.join(workspace, path), workspace, repos):
+        if not in_scope(rule, os.path.join(repo_root, path), workspace, repos):
             continue
         hits.append(path)
     return hits
@@ -430,13 +450,19 @@ def main(argv):
 
     staged = staged_files()
     repos = manifest_repos(workspace)
+    # Fail protective: with no git root to resolve against, fall back to the workspace,
+    # which is correct in the monorepo layout and no worse than the old behaviour.
+    repo_root = git_root() or os.path.abspath(workspace)
+    if verbose:
+        print(f"  workspace: {workspace}")
+        print(f"  git root:  {repo_root}")
     blocking, warning = [], []
 
     for rule in rules:
         severity = rule["_severity"]
         try:
             if rule["_check"] == "staged-paths":
-                hits = check_staged_paths(rule, staged, workspace, repos)
+                hits = check_staged_paths(rule, staged, repo_root, workspace, repos)
             elif rule["_check"] == "secret-scan":
                 hits, note, broken = check_secret_scan(rule, verbose)
                 if note:
