@@ -29,6 +29,27 @@ To exercise them end to end, install Lodestar into a scratch workspace:
 ./install.sh /tmp/lodestar-scratch && cd /tmp/lodestar-scratch && claude
 ```
 
+## One-time setup after cloning
+
+The repo dogfoods its own guardrails, and two of the three surfaces work the moment you
+open the clone: the PreToolUse engine and `permissions.deny` are both wired through the
+committed `.claude/settings.json`.
+
+The **commit surface is not**, because `.git/hooks/` cannot be tracked. Wire it once:
+
+```bash
+cp .claude/hooks/lodestar-precommit-check.py .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+Without it your commits skip the `commit`-surface rules — which for this repo means a
+staged real `.env` and a direct commit to `main` both go unchallenged locally. Server-side
+branch protection still catches the second one; nothing catches the first. `git commit
+--no-verify` is the deliberate bypass once it is wired.
+
+If you use [mise](https://mise.jdx.dev), `mise.toml` loads a gitignored `.env` into the
+shell so `gh` picks up `GH_TOKEN` without a separate login. Entirely optional.
+
 ## Adding to the kit
 
 See [`docs/EXTENDING.md`](docs/EXTENDING.md) — add a catalog entry (guardrail / agent /
