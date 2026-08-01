@@ -49,6 +49,7 @@ A pattern only sees a string. Rules whose intent depends on state a regex cannot
 | `match: argv` | `bash` | Match the command's *unquoted* words instead of the raw string, so quoted or echoed text that runs nothing cannot trip the rule. Payloads passed to a nested shell (`bash -c "…"`, `eval "…"`) are still matched. |
 | `allow_paths: ['^/tmp/']` | `bash` | Skip when **every** operand is an absolute path matching one of these prefixes. Relative operands and compound commands (`&&`, `;`, `\|`, `$(…)`) never qualify. |
 | `ignore_case: false` | both | Opt out of the default case-insensitive match — useful for a path pattern that should not also match `FOO.KEY`. |
+| `requires_manifest_missing: a.b` | both | Fire only while that dotted manifest path is absent, `false`, or empty. Turns a rule into a **self-silencing reminder**: it nags while setup is missing and goes quiet once the manifest records it. Note the failure direction — no manifest at all counts as missing, so the reminder appears rather than suppressing itself. |
 
 Two properties to preserve when adding a flag:
 
@@ -74,6 +75,8 @@ A `commit`/`both` rule needs something the pre-commit checker can run — `commi
 | `default-branch` | whether HEAD is the repo's default branch |
 
 `commit_severity` overrides `severity` on the commit surface only — use it where a rule should merely remind Claude but hard-stop a commit.
+
+A rule that reminds rather than forbids should silence itself. Without `requires_manifest_missing` you get one of two bad outcomes: a permanent nag (which trains people to ignore every warn the engine emits) or a one-time message (which is indistinguishable from no rule at all). `design-guidance-on-ui-edits` is the reference: it fires on UI edits while `designGuidance.installed` is false, and never again once it is true.
 
 **Choosing a surface is a judgement about false positives, not about how much you care.** Three rules that look like obvious commit-surface candidates are deliberately `agent`-only:
 

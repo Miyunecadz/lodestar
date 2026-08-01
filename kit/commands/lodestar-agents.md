@@ -45,11 +45,25 @@ Keep the body **thin**. If a body would restate a skill's content, replace that 
 ## 5b. Resolve each agent's `loads` dependencies
 An agent's `loads` names skills it depends on. Before finishing, make sure each is actually available — a delegation trigger that points at a missing skill is a dead end:
 - **Lodestar catalog skill** (exists in `.lodestar/catalog/skills/`): copy it into `./.claude/skills/` if not already installed (parameterizing any `REPO` placeholder), same as `/lodestar-onboard` does.
-- **Plugin skill** (e.g. `frontend-design`, which `ui-designer` loads): check whether the plugin is installed. If it is **not**, ask the user (AskUserQuestion) — do not fail silently:
-  1. **Install it now** — tell them to run `/plugin install frontend-design@claude-plugins-official` (marketplace `claude-plugins-official`), then continue.
-  2. **Proceed without it** — still generate the agent; its body already degrades gracefully (falls back to sound defaults and flags that the skill was missing).
-  Record which choice was made in the report.
+- **Plugin skill** (e.g. `frontend-design`, which `ui-designer` loads): check whether the plugin is installed. If it is **not**, ask the user (AskUserQuestion) — do not fail silently. Put **install** first and mark it recommended:
+  1. **Install it now (recommended)** — `/plugin install frontend-design@claude-plugins-official` (marketplace `claude-plugins-official`), then continue.
+  2. **Proceed without it** — still generate the agent; its body degrades gracefully (sound defaults, and it flags the missing guidance *every* time, not once).
+
+  Then **record the outcome in the manifest**, because a decision nobody remembers is a decision that silently becomes permanent:
+  ```json
+  "designGuidance": {
+    "skill": "frontend-design",
+    "installed": true,
+    "decidedAt": "<ISO-8601 UTC>"
+  }
+  ```
+  On a decline, write `"installed": false` with `"status": "declined"` and the date. Two things follow from that record:
+  - **A later run re-offers it.** If `designGuidance.installed` is false, ask again rather than treating one decline as forever — plugin availability and the user's mind both change.
+  - **The `design-guidance-on-ui-edits` guardrail stays active** while `installed` is false, so UI edits keep surfacing the gap. That rule reads exactly this manifest key (`requires_manifest_missing: designGuidance.installed`), which is what makes it self-silencing once guidance *is* installed.
+
+  Only write `"installed": true` once the skill is actually available — never optimistically after telling the user to run the install command. If you cannot confirm it, leave it false and say so; a wrongly-recorded `true` silences the backstop for good, which is the failure this whole path exists to prevent.
 
 ## 6. Update the manifest & report
 - Set `.claude/lodestar.manifest.json` `agents` to the generated ids.
-- Report which agents were created, their tool profiles, and which repo each is scoped to. Note that the main session acts as the orchestrator that delegates to these roles — it holds the breadth; the roles hold the depth.
+- Carry over the `designGuidance` record from §5b if a plugin-backed agent was involved.
+- Report which agents were created, their tool profiles, and which repo each is scoped to. If design guidance was **declined**, say plainly that UI generated in this workspace has no anti-slop guidance behind it, that `design-guidance-on-ui-edits` will keep flagging UI edits, and that re-running this command re-offers the install. Note that the main session acts as the orchestrator that delegates to these roles — it holds the breadth; the roles hold the depth.

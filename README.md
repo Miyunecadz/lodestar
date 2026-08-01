@@ -130,6 +130,7 @@ bash install.sh ~/code/my-workspace --ref v0.6.0     # any release from v0.5.0 o
 - [`kit/catalog/CATALOG.md`](kit/catalog/CATALOG.md) — the grouped index: universal core + stack packs.
 - [`examples/walkthrough.md`](examples/walkthrough.md) — a concrete end-to-end example.
 - [`docs/CI.md`](docs/CI.md) — CI checks, trunk-based release automation, and the branch-protection ruleset.
+- [`docs/spikes/`](docs/spikes/) — evaluations of tools considered but not adopted, with the reasoning (e.g. Impeccable's design detector).
 
 ## Requirements
 
