@@ -14,6 +14,38 @@ Everything in Lodestar is a plain file. Adding capability means adding a catalog
    - `emits: rule` for declarative rules (enforced by the bundled engine); `emits: settings-hook` only if it needs custom shell logic.
 3. Write a message body that **redirects to the right action**, not just "denied." Put the redirect first, then a bare `---` line, then the design rationale — see below.
 4. Re-run `/lodestar-guardrails` and tick your new rule.
+3. Write a message body that **redirects to the right action**, not just "denied."
+4. **Add fixtures** to `.github/fixtures/guardrails.tsv` — at least one case showing it fires and one showing what it must not match. CI rejects a guardrail with neither.
+5. Re-run `/lodestar-guardrails` and tick your new rule.
+
+### Behaviour fixtures
+
+`validate.py` checks that a pattern *compiles*. That is not the same as checking it matches what the rule's title claims, and the gap is silent: a tightened regex that accidentally stops matching looks exactly like a working one.
+
+`.github/scripts/test-catalog.py` closes it by installing the **real** `kit/catalog/guardrails/<id>.md` — applying the same `id:` → `name:` transform `/lodestar-guardrails` §5 does — and running the shipped engine against it. Hand-written copies of a rule in a test file cannot do this: if the copy and the catalog drift apart, both keep passing.
+
+The table is tab-separated:
+
+```
+rule-id <TAB> verdict <TAB> input <TAB> context
+
+  verdict  DENY | WARN | ALLOW
+  input    a file path for `event: file`, a command for `event: bash`
+  context  optional key=value,key=value —
+             branch=default   run with HEAD on the repo's default branch
+             untracked=1      leave the file untracked, for `allow_if_untracked`
+             path=<path>      for `match: content` rules: the file being edited
+                              (the input is then the edited content)
+```
+
+The harness builds a workspace whose manifest declares **one repo per stack the catalog targets**, so a stack-scoped rule has both a repo it belongs in and a repo it must stay out of. One rule is installed at a time — several rules match `git commit`, and a shared rule set would blur which one produced the verdict.
+
+Two things worth knowing when adding cases:
+
+- **A negative case must fail for the reason you think.** Every file path is committed unless the row says `untracked=1`, because an untracked file is skipped by `allow_if_untracked` rules for a reason unrelated to the pattern or the stack. Mutation-testing this harness caught exactly that: widening a migration rule to `stacks: [all]` failed nothing, because its wrong-stack negative was passing on untracked-ness.
+- **`emits: settings-hook` entries never reach the engine.** The picker writes a `settings.json` PostToolUse hook whose matcher uses the pattern, so those rows assert the pattern directly. Asserting an engine verdict would test a path that does not exist in production.
+
+Prefer cases that pin a claim the rule body already makes — the negative lookahead, the stack scope, the quoted-argument exemption. A case that merely re-states "this regex matches this string" adds a line and no confidence.
 
 ### The `---` split: redirect above, rationale below
 

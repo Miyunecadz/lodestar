@@ -38,6 +38,10 @@ jobs:
       - name: Smoke-test the guardrail engine
         run: bash .github/scripts/test-engine.sh
 
+      # Runs the REAL catalog entries, not hand-written copies of them.
+      - name: Execute the catalog guardrails against their fixtures
+        run: python3 .github/scripts/test-catalog.py
+
       - name: Smoke-test the installer
         run: bash .github/scripts/test-install.sh
 

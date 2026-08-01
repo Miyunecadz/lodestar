@@ -4,6 +4,7 @@
 Checks, with stdlib only:
   - every guardrail has the required frontmatter, valid enums, and a compilable regex;
   - every agent/skill has the required frontmatter;
+  - every guardrail has positive and negative behaviour fixtures;
   - every guardrail's block-time message fits the redirect budget;
   - changelog.d/ fragments are well-formed;
   - VERSION matches the top CHANGELOG entry;
@@ -210,6 +211,48 @@ def git_tags():
         return None
     out = proc.stdout.decode("utf-8", "replace")
     return {t[1:] for t in out.split() if re.fullmatch(r"v\d+\.\d+\.\d+", t)}
+def check_fixture_coverage():
+    """Every guardrail needs a positive and a negative behaviour fixture.
+
+    A pattern that compiles is not a pattern that matches what its title claims. This
+    is the gate that stops a new catalog entry shipping with nothing asserting its
+    behaviour; `.github/scripts/test-catalog.py` is what actually runs them.
+
+    Both directions are required. A rule with only positives cannot regress into
+    matching everything, and a rule with only negatives cannot regress into matching
+    nothing — and silent non-enforcement is the failure mode that matters here.
+    """
+    path = os.path.join(ROOT, ".github/fixtures/guardrails.tsv")
+    if not os.path.exists(path):
+        errors.append(".github/fixtures/guardrails.tsv is missing")
+        return
+    positive, negative = {}, {}
+    for lineno, line in enumerate(open(path), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) < 3:
+            errors.append(f".github/fixtures/guardrails.tsv:{lineno}: needs 3 tab-separated fields")
+            continue
+        rule_id, want = parts[0].strip(), parts[1].strip()
+        if want not in ("DENY", "WARN", "ALLOW"):
+            errors.append(
+                f".github/fixtures/guardrails.tsv:{lineno}: verdict must be "
+                f"DENY|WARN|ALLOW (got {want!r})")
+            continue
+        bucket = negative if want == "ALLOW" else positive
+        bucket[rule_id] = bucket.get(rule_id, 0) + 1
+    for entry in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
+        rule_id = os.path.basename(entry)[:-3]
+        if not positive.get(rule_id):
+            errors.append(
+                f"guardrail '{rule_id}' has no positive fixture — add a case to "
+                ".github/fixtures/guardrails.tsv showing it fires")
+        if not negative.get(rule_id):
+            errors.append(
+                f"guardrail '{rule_id}' has no negative (ALLOW) fixture — add a case "
+                "showing what it must NOT match; a rule that matches everything passes "
+                "positives just fine")
 # Ceiling on the part of a rule body that reaches the model when the rule fires. Issue
 # #30 suggested ~600; the well-written redirects actually land between 223 and 829, and
 # trimming to 600 would mean deleting things the model needs to act on. 900 sits above
@@ -326,6 +369,7 @@ def main():
     check_skills()
     check_catalog_totals()
     check_catalog_listed()
+    check_fixture_coverage()
     check_redirect_budget()
     check_fragments()
     check_version()

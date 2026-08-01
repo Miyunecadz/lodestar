@@ -1,0 +1,143 @@
+# Behaviour fixtures for the shipped catalog guardrails. Tab-separated:
+#
+#   rule-id <TAB> verdict <TAB> input <TAB> context
+#
+#   verdict  DENY | WARN | ALLOW
+#   input    a file path for `event: file`, a command for `event: bash`
+#   context  optional `key=value,key=value` —
+#              branch=default   run with HEAD on the repo's default branch
+#              path=<path>      for `match: content` rules: the file being edited
+#                               (the input is then the edited content)
+#
+# `.github/scripts/test-catalog.py` installs the REAL catalog entry for each row, the
+# way /lodestar-guardrails does, and asserts the engine's verdict. Every rule needs at
+# least one positive and one negative case; validate.py fails a rule that lacks either,
+# so a new catalog entry cannot ship untested.
+#
+# Prefer cases that pin a claim the rule's own body makes. A regex that merely compiles
+# is already covered by validate.py; what is worth asserting is the edge the author had
+# in mind — the lookahead, the stack scope, the quoted-argument exemption.
+
+# --- secrets -------------------------------------------------------------------------
+# The negative lookahead exists because an earlier version blocked .env.local.example.
+block-env-files	DENY	web/.env
+block-env-files	DENY	web/.env.production
+block-env-files	DENY	web/.env.local
+block-env-files	ALLOW	web/.env.example
+block-env-files	ALLOW	web/.env.local.example
+block-env-files	ALLOW	web/.env.sample
+block-env-files	ALLOW	web/.env.dist
+block-env-files	ALLOW	web/src/environment.ts
+
+block-secret-files	DENY	php/certs/server.key
+block-secret-files	DENY	web/certs/tls.pem
+block-secret-files	DENY	api/.ssh/id_rsa
+block-secret-files	DENY	api/.ssh/id_ed25519
+block-secret-files	ALLOW	web/src/monkey.ts
+block-secret-files	ALLOW	docs/keys.md
+
+# --- destructive shell ---------------------------------------------------------------
+# allow_paths exempts temp targets; match: argv means quoted text runs nothing.
+block-destructive-commands	DENY	rm -rf build
+block-destructive-commands	DENY	git reset --hard origin/main
+block-destructive-commands	DENY	git clean -fdx
+block-destructive-commands	ALLOW	rm -rf /tmp/scratch
+block-destructive-commands	ALLOW	echo "rm -rf /"
+block-destructive-commands	ALLOW	gh issue create -f body="then run rm -rf dist"
+block-destructive-commands	ALLOW	ls -la
+# A temp path mixed with a real one is not exempt, and compound commands never are.
+block-destructive-commands	DENY	rm -rf /tmp/scratch build
+block-destructive-commands	DENY	cd /tmp && rm -rf /tmp/scratch
+
+protect-default-branch	DENY	git push -f origin main
+protect-default-branch	DENY	git push --force origin main
+protect-default-branch	ALLOW	git push --force-with-lease origin main
+protect-default-branch	ALLOW	git push origin main
+
+# --- branch discipline ---------------------------------------------------------------
+block-commit-to-default-branch	DENY	git commit -m "x"	branch=default
+block-commit-to-default-branch	DENY	git push	branch=default
+block-commit-to-default-branch	ALLOW	git commit -m "x"
+block-commit-to-default-branch	ALLOW	git status	branch=default
+
+# --- migrations: tracked = applied, and each stays in its own stack ------------------
+# Every wrong-stack negative here must be TRACKED, or it passes on untracked-ness and
+# proves nothing about scoping — which is exactly what mutation-testing caught.
+# The `untracked=1` rows are the other half of the claim: the migration you just
+# scaffolded is still editable.
+block-edit-applied-migrations	DENY	svc/db/migrations/001_init.sql
+block-edit-applied-migrations	ALLOW	web/db/migrations/001_init.sql
+block-edit-applied-migrations	ALLOW	svc/db/seeds/001_init.sql
+block-edit-applied-migrations	ALLOW	svc/db/migrations/002_new.sql	untracked=1
+
+block-edit-applied-migrations-django	DENY	api/app/migrations/0001_initial.py
+block-edit-applied-migrations-django	ALLOW	web/app/migrations/0001_initial.py
+block-edit-applied-migrations-django	ALLOW	api/app/migrations/helpers.py
+block-edit-applied-migrations-django	ALLOW	api/app/migrations/0002_add_field.py	untracked=1
+
+block-edit-applied-migrations-laravel	DENY	php/database/migrations/2024_01_01_000000_create_users.php
+block-edit-applied-migrations-laravel	ALLOW	web/database/migrations/2024_01_01_000000_create_users.php
+block-edit-applied-migrations-laravel	ALLOW	php/database/seeders/UserSeeder.php
+block-edit-applied-migrations-laravel	ALLOW	php/database/migrations/2024_06_01_000000_add_col.php	untracked=1
+
+# --- generated + vendored ------------------------------------------------------------
+no-hand-edit-lockfiles	DENY	web/yarn.lock
+no-hand-edit-lockfiles	DENY	api/poetry.lock
+no-hand-edit-lockfiles	ALLOW	web/yarn.lockfile
+no-hand-edit-lockfiles	ALLOW	web/package.json
+
+protect-dbmate-schema	DENY	svc/db/schema.sql
+protect-dbmate-schema	ALLOW	web/db/schema.sql
+protect-dbmate-schema	ALLOW	svc/db/schema.md
+
+protect-generated-files	DENY	docs/api/architecture/graph.json
+protect-generated-files	DENY	svc/dump.rdb
+protect-generated-files	ALLOW	web/package.json
+
+protect-laravel-generated	DENY	php/bootstrap/cache/config.php
+protect-laravel-generated	DENY	php/storage/framework/views/x.php
+protect-laravel-generated	ALLOW	php/app/Models/User.php
+protect-laravel-generated	ALLOW	web/bootstrap/cache/config.php
+
+mobile-use-patch-package	DENY	mobile/node_modules/react-native/index.js
+mobile-use-patch-package	ALLOW	web/node_modules/react/index.js
+mobile-use-patch-package	ALLOW	mobile/src/App.tsx
+
+# --- content-matched -----------------------------------------------------------------
+nextjs-no-public-secrets	WARN	const k = process.env.NEXT_PUBLIC_API_SECRET	path=next/app/page.tsx
+nextjs-no-public-secrets	WARN	NEXT_PUBLIC_STRIPE_SECRET_KEY=sk_live	path=next/.env.local.example
+nextjs-no-public-secrets	ALLOW	const u = process.env.NEXT_PUBLIC_SITE_URL	path=next/app/page.tsx
+nextjs-no-public-secrets	ALLOW	const k = process.env.NEXT_PUBLIC_API_SECRET	path=web/src/app.ts
+
+# --- advisory, on git commit ---------------------------------------------------------
+commit-message-style	WARN	git commit -m "feat: x"
+commit-message-style	WARN	git commit --amend
+commit-message-style	ALLOW	git status
+commit-message-style	ALLOW	echo "git commit -m x"
+
+scan-secrets-before-commit	WARN	git commit -m "feat: x"
+scan-secrets-before-commit	ALLOW	git log --oneline
+
+verifier-before-commit	WARN	git commit -m "feat: x"
+verifier-before-commit	ALLOW	git diff --cached
+
+# --- self-silencing reminder ---------------------------------------------------------
+# Fires only while the manifest lacks designGuidance.installed, which it does here.
+design-guidance-on-ui-edits	WARN	web/components/Button.tsx
+design-guidance-on-ui-edits	WARN	next/app/page.tsx
+design-guidance-on-ui-edits	ALLOW	api/app/main.py
+design-guidance-on-ui-edits	ALLOW	svc/db/seeds/001.sql
+
+# --- emits: settings-hook ------------------------------------------------------------
+# These never reach the engine — the picker writes a settings.json PostToolUse hook
+# whose matcher uses this pattern, so the pattern is matched directly. WARN = matches.
+autolint-on-edit	WARN	web/src/components/Button.tsx
+autolint-on-edit	WARN	next/app/page.jsx
+autolint-on-edit	ALLOW	web/scripts/build.js
+autolint-on-edit	ALLOW	web/src/styles.css
+
+python-autolint-on-edit	WARN	api/app/views.py
+python-autolint-on-edit	ALLOW	api/README.md
+
+php-autolint-on-edit	WARN	php/app/Models/User.php
+php-autolint-on-edit	ALLOW	php/composer.json
