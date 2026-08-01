@@ -73,7 +73,7 @@ docs/
 
 **Keeping the map fresh — a correctness concern, not just hygiene.** Because the router tells agents to *trust* the graph over re-reading source, a stale map doesn't merely underperform — it **actively misleads**. So the map carries a freshness fingerprint (`mapping.lastMappedSha` / `lastMappedAt`, written by `/lodestar-onboard`), and `/lodestar-freshness` installs the mechanism that maintains it, tiered by architecture:
 - **graphify** → a **lockstep pre-commit hook** rebuilds any repo with staged code and stages the refreshed `graph.json`/`GRAPH_REPORT.md`/`graph.html` into the *same* commit, so code and map move together on every branch, checkout, and pull. Deterministic, offline (~1s), and it **never blocks a commit** — a missing CLI or failure degrades to a hint. A union merge driver keeps two branches' rebuilt graphs from conflicting.
-- **markdown** → regeneration needs the LLM mapping pass, so it is **never silent**: an offline drift detector (`lastMappedSha..HEAD` for code under the repo) surfaces staleness, and `/lodestar-refresh <repo>` re-runs the mapping on demand.
+- **markdown** → regeneration needs the LLM mapping pass, so it is **never silent**: an offline drift detector (`lastMappedSha..HEAD` for code under the repo) surfaces staleness, and `/lodestar-refresh <repo>` re-runs the mapping on demand. The fingerprint is a commit in the *repo's own* history, so the detector resolves each repo's git root and runs there — which is what makes it work in the separate-sub-repos layout of §6, where the workspace root is not a repository at all.
 
 This is opt-in, integrates with the repo's existing git-hook manager (lefthook / husky / `core.hooksPath` / plain) without clobbering, and is re-synced by `/lodestar-update`.
 

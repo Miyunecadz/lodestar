@@ -36,7 +36,7 @@ skill), a template, or a stack detector. Everything is plain Markdown; no code c
 
 ## Before you push
 
-CI runs six gates (see `.github/workflows/ci.yml`); run them locally:
+CI runs seven gates (see `.github/workflows/ci.yml`); run them locally:
 
 ```bash
 shellcheck --severity=error install.sh .github/scripts/test-*.sh
@@ -45,6 +45,7 @@ bash   .github/scripts/test-engine.sh        # guardrail engine (agent surface)
 bash   .github/scripts/test-install.sh       # installer: clone, bootstrap, pinning, refusals
 bash   .github/scripts/test-precommit.sh     # commit surface: staged-diff enforcement
 bash   .github/scripts/test-coverage.sh      # graph completeness: on-disk code vs graph nodes
+bash   .github/scripts/test-freshness.sh     # map drift, in BOTH workspace layouts
 ```
 
 Bump `VERSION` and add a matching top entry to `CHANGELOG.md` in the same change —
