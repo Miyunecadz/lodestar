@@ -5,6 +5,7 @@ Checks, with stdlib only:
   - every guardrail has the required frontmatter, valid enums, and a compilable regex;
   - every agent/skill has the required frontmatter;
   - every guardrail's block-time message fits the redirect budget;
+  - changelog.d/ fragments are well-formed;
   - VERSION matches the top CHANGELOG entry;
   - every CHANGELOG heading's release status matches the actual git tags.
 Exits non-zero (listing every problem) if anything is off.
@@ -165,6 +166,33 @@ def check_catalog_listed():
             errors.append(f"kit/catalog/CATALOG.md does not list skill '{name}'")
 
 
+def check_fragments():
+    """Changelog fragments must be releasable without a human reading them first.
+
+    Feature PRs add a file here instead of editing `CHANGELOG.md` and `VERSION`, which
+    is what stops two open PRs conflicting on the same hot line. The cost of that is
+    that nobody sees a fragment until release time, so what would have been a review
+    comment has to be a check.
+    """
+    directory = os.path.join(ROOT, "changelog.d")
+    if not os.path.isdir(directory):
+        return
+    for name in sorted(os.listdir(directory)):
+        if name == "README.md":
+            continue
+        rel = f"changelog.d/{name}"
+        if not name.endswith(".md"):
+            errors.append(f"{rel}: fragments must be .md files")
+            continue
+        body = open(os.path.join(directory, name)).read().strip()
+        if not body:
+            errors.append(f"{rel} is empty")
+        elif re.search(r"^##\s*\[", body, re.M):
+            errors.append(
+                f"{rel} contains a '## [version]' heading — a fragment is the section "
+                "body only; release.py writes the heading")
+
+
 def git_tags():
     """Every `vX.Y.Z` tag in this checkout, as a set of bare versions.
 
@@ -239,7 +267,10 @@ def check_version():
     headings = re.findall(r"^##\s*\[(\d+\.\d+\.\d+)\]\s*(.*)$", text, re.M)
     top = headings[0][0] if headings else None
     if top != version:
-        errors.append(f"VERSION ({version}) != top CHANGELOG entry ({top}) — bump both together")
+        errors.append(
+            f"VERSION ({version}) != top CHANGELOG entry ({top}) — both are written by "
+            "`.github/scripts/release.py <version>`; a feature PR should not touch either "
+            "(add a changelog.d/ fragment instead)")
 
     # Release status is a mechanically checkable claim, and it drifted: every heading
     # read "Unreleased" including twelve published versions, which release.yml then
@@ -258,14 +289,21 @@ def check_version():
         pending = re.fullmatch(r"—\s*Unreleased", suffix)
         never = re.fullmatch(r"—\s*not released", suffix)
         if index == 0:
-            if not pending:
-                errors.append(
-                    f"CHANGELOG [{ver}] is the top entry and must read '— Unreleased', not {suffix!r}"
-                )
+            # The top entry has two legitimate states, because `release.py` writes the
+            # section in a PR and `release.yml` creates the tag when that PR merges:
+            #   pending  — written, not yet merged, so no tag exists
+            #   released — merged and tagged, which is the steady state between releases
             if ver in tags:
+                if not dated:
+                    errors.append(
+                        f"CHANGELOG [{ver}] is tagged as v{ver} but its heading reads "
+                        f"{suffix!r} — run `.github/scripts/release.py <next>`, which "
+                        "stamps the previous version's date"
+                    )
+            elif not pending:
                 errors.append(
-                    f"CHANGELOG [{ver}] is the top entry but v{ver} is already tagged — "
-                    "bump VERSION and open a new section (this is how 0.8.0/0.9.0 were skipped)"
+                    f"CHANGELOG [{ver}] has no v{ver} tag yet, so as the top entry it "
+                    f"must read '— Unreleased', not {suffix!r}"
                 )
             continue
         if ver in tags:
@@ -289,6 +327,7 @@ def main():
     check_catalog_totals()
     check_catalog_listed()
     check_redirect_budget()
+    check_fragments()
     check_version()
     if errors:
         print("❌ validation failed:")

@@ -24,9 +24,24 @@ Helper scripts live in `.github/scripts/` (`validate.py`, `test-engine.sh`, `tes
 
 ## Cutting a release (trunk-based)
 
-1. On a feature branch, bump `VERSION` and add the matching `## [X.Y.Z] — Unreleased` section to `CHANGELOG.md`. **In the same PR, stamp the previous version's release date** on its heading — that version is tagged by now, and `validate.py` fails until it carries a date. `git log -1 --format=%cI vX.Y.Z` gives it.
-2. Open a PR. `ci` must pass (it checks that `VERSION` and the top `CHANGELOG` entry agree).
-3. Merge to `main` → `release.yml` tags `vX.Y.Z` and publishes the GitHub Release automatically.
+Feature PRs never touch `VERSION` or `CHANGELOG.md` — they add a fragment to
+[`changelog.d/`](../changelog.d/README.md). Both files have exactly one hot line, so any
+two PRs that edited them conflicted with each other structurally, regardless of branching
+or merge method. Two PRs adding two different fragment files cannot.
+
+1. On a branch, run `.github/scripts/release.py X.Y.Z` (`--dry-run` first if you like). It
+   folds every fragment into a new `## [X.Y.Z] — Unreleased` section, bumps `VERSION`,
+   deletes the fragments, and **stamps the previous version's release date** — that last
+   step used to be manual, which is why it got forgotten for twelve versions.
+2. Open a PR. `ci` must pass; it checks `VERSION` against the top `CHANGELOG` heading and
+   every heading's release status against the real tags.
+3. Merge to `main` → the `VERSION` change triggers `release.yml`, which tags `vX.Y.Z` and
+   publishes the GitHub Release from that section. No manual tagging.
+
+The top heading has two valid states, which is why `validate.py` accepts both: `—
+Unreleased` while the release PR is open and no tag exists yet, and a date once it has
+merged and been tagged. Every heading below the top must be dated if tagged, or say
+`— not released` if it never shipped.
 
 ## Enforcing "no direct merge to the default branch"
 

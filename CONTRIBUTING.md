@@ -83,8 +83,12 @@ LODESTAR_TEST_PYTHON="$FLOOR" bash .github/scripts/test-engine.sh
 LODESTAR_TEST_PYTHON="$FLOOR" bash .github/scripts/test-precommit.sh
 ```
 
-Bump `VERSION` and add a matching top entry to `CHANGELOG.md` in the same change —
-`validate.py` enforces that they agree, and a bump on `main` cuts a release.
+Do **not** edit `VERSION` or `CHANGELOG.md`. Add one file to
+[`changelog.d/`](changelog.d/README.md) instead — `<issue>-<slug>.md`, holding the body
+of the changelog section you would have written. Those two files have exactly one hot
+line each, so every PR that touched them conflicted with every other open PR; two PRs
+adding two different fragments cannot. `.github/scripts/release.py <version>` folds the
+fragments in, bumps `VERSION`, and stamps the previous release's date at release time.
 
 Commits: keep the subject to one line, no co-author trailer (matches the
 `commit-message-style` guardrail the kit ships).
