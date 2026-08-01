@@ -26,7 +26,9 @@
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "ci" }
+          { "context": "ci" },
+          { "context": "python 3.8" },
+          { "context": "python 3.x" }
         ]
       }
     }

@@ -39,3 +39,35 @@ jobs:
 
       - name: Smoke-test the permission surface
         run: bash .github/scripts/test-permissions.sh
+
+  # The enforcement hooks ship to machines whose `python3` is not this runner's. A
+  # version-floor break does not fail loudly — it makes every guardrail silently inert
+  # (issue #29) — so the two suites that assert enforcement run against the declared
+  # floor as well as the current release. MIN_PYTHON in both hooks is the source of
+  # truth; changing it means changing the matrix below.
+  #
+  # Pinned to 22.04: actions/setup-python has no 3.8 build for ubuntu-24.04.
+  python-floor:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.x"]
+    name: python ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        id: setup
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Smoke-test the guardrail engine
+        env:
+          LODESTAR_TEST_PYTHON: ${{ steps.setup.outputs.python-path }}
+        run: bash .github/scripts/test-engine.sh
+
+      - name: Smoke-test the commit-surface guardrails
+        env:
+          LODESTAR_TEST_PYTHON: ${{ steps.setup.outputs.python-path }}
+        run: bash .github/scripts/test-precommit.sh

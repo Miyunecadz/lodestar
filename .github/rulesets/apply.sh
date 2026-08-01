@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Apply (or update) the "protect-main" branch ruleset that enforces trunk-based development:
 #   - a pull request is required before merging (blocks direct pushes to the default branch)
-#   - the `ci` status check must pass
+#   - the `ci` and `python <version>` status checks must pass
 #   - force-pushes and branch deletion are blocked
 #
 # Requires: gh (authenticated, with admin on the repo). Usage:

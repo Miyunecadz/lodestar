@@ -270,7 +270,7 @@ The catalog *is* the product. Fork it, delete what you dislike, add your own.
 | | |
 |---|---|
 | **Required** | [Claude Code](https://code.claude.com) · **git** (for the workspace, the bootstrap installer, and `/lodestar-update`) |
-| **For guardrails** | **Python 3**, stdlib only — no packages, no plugin. The engine is bundled and installed by `/lodestar-guardrails`. |
+| **For guardrails** | **Python 3.8+**, stdlib only — no packages, no plugin. The engine is bundled and installed by `/lodestar-guardrails`. Under 3.8 it says so in unmistakable terms rather than quietly enforcing nothing. |
 | **Optional** | [Graphify](https://github.com/Graphify-Labs/graphify) for auto-generated architecture graphs. Installs at **user level, no sudo**: `uv tool install graphifyy` (or `pipx install graphifyy`), then `graphify install`. If absent, `/lodestar-onboard` offers a Markdown `architecture/overview.md` instead — it is never required. |
 
 <details>
