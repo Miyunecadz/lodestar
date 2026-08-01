@@ -57,10 +57,10 @@ skill), a template, or a stack detector. Everything is plain Markdown; no code c
 
 ## Before you push
 
-CI runs eight gates (see `.github/workflows/ci.yml`); run them locally:
+CI runs nine gates (see `.github/workflows/ci.yml`); run them locally:
 
 ```bash
-shellcheck --severity=error install.sh .github/scripts/test-*.sh
+find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck --severity=error
 python3 .github/scripts/validate.py          # catalog frontmatter + VERSION↔CHANGELOG
 bash   .github/scripts/test-engine.sh        # guardrail engine (agent surface)
 bash   .github/scripts/test-install.sh       # installer: clone, bootstrap, pinning, refusals
@@ -68,6 +68,7 @@ bash   .github/scripts/test-precommit.sh     # commit surface: staged-diff enfor
 bash   .github/scripts/test-coverage.sh      # graph completeness: on-disk code vs graph nodes
 bash   .github/scripts/test-freshness.sh     # map drift, in BOTH workspace layouts
 bash   .github/scripts/test-permissions.sh   # permission surface: idempotent, reversible deny merge
+bash   .github/scripts/test-graph-refresh.sh # the pre-commit hook that stages the graph
 ```
 
 If you touched a hook in `kit/templates/hooks/`, also run the two enforcement suites

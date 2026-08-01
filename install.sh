@@ -160,14 +160,15 @@ if [ -f "$KIT_DIR/VERSION" ]; then
   VERSION="$(tr -d '[:space:]' < "$KIT_DIR/VERSION")"
 fi
 printf '%s\n' "$SOURCE_ORIGIN" > "$TARGET/.lodestar/SOURCE"
-cat > "$TARGET/.lodestar/source.json" <<JSON
-{
-  "kind": "$SOURCE_KIND",
-  "origin": "$SOURCE_ORIGIN",
-  "ref": "${REF:-}",
-  "version": "$VERSION"
-}
-JSON
+# Encoded by json.dumps, not interpolated into a heredoc: `origin` is either a filesystem
+# path from a clone install or a hand-set $LODESTAR_REPO, and one `"` or `\` in either
+# produces a file `/lodestar-update` cannot parse. The failure is silent at write time and
+# only surfaces much later, during an unrelated operation. Python 3 is already required.
+KIND="$SOURCE_KIND" ORIGIN="$SOURCE_ORIGIN" REF="${REF:-}" VER="$VERSION" python3 -c '
+import json, os, sys
+keys = (("kind", "KIND"), ("origin", "ORIGIN"), ("ref", "REF"), ("version", "VER"))
+sys.stdout.write(json.dumps({k: os.environ[e] for k, e in keys}, indent=2) + "\n")
+' > "$TARGET/.lodestar/source.json"
 
 if [ "$MODE" = "install" ]; then
   cat <<EOF

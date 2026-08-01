@@ -16,8 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Shellcheck install.sh
-        run: shellcheck --severity=error install.sh .github/scripts/test-install.sh .github/scripts/test-precommit.sh .github/scripts/test-coverage.sh .github/scripts/test-freshness.sh .github/scripts/test-permissions.sh
+      # Discovered, not listed. The hand-maintained list had drifted: it missed
+      # kit/templates/hooks/lodestar-graph-refresh.sh — the one shell script installed
+      # into users' git-hook managers, which runs on every commit and `git add`s into it.
+      # The highest-reach script in the repo was the only one not linted.
+      - name: Shellcheck every shell script
+        run: find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck --severity=error
 
       - name: Validate catalog + version consistency
         run: python3 .github/scripts/validate.py
@@ -36,6 +40,9 @@ jobs:
 
       - name: Smoke-test graph freshness
         run: bash .github/scripts/test-freshness.sh
+
+      - name: Smoke-test the graph-refresh pre-commit hook
+        run: bash .github/scripts/test-graph-refresh.sh
 
       - name: Smoke-test the permission surface
         run: bash .github/scripts/test-permissions.sh

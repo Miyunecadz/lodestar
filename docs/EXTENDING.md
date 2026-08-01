@@ -55,6 +55,7 @@ Two properties to preserve when adding a flag:
 
 - **Fail protective.** Every probe is best-effort. No git, no manifest, an unparseable command, a detached HEAD — the rule must fall back to behaving as a plain pattern match (or stay silent, for a rule that *adds* blocking). It must never quietly drop an existing safety rule.
 - **Never raise.** The engine allows the action on any internal error. A guardrail that crashes the hook would block every tool call in the workspace.
+- **Never hang.** Never-raise is an *inner* guarantee: it only holds for code that reaches its own exception handler. A hook wedged on a stalled network mount never gets there, and Claude Code's default timeout for a `command` hook is **600 seconds**. So the registration in `/lodestar-guardrails` sets `"timeout": 5` — the outer layer of the same promise. Measured latency is ~25 ms with eight rules, so the ceiling has roughly 200× headroom; it exists to bound a pathological environment, not a normal one. Any hook the kit registers needs the field.
 
 #### One rule failing vs. the whole rule set failing
 

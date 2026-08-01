@@ -55,6 +55,19 @@ expect_json "records kind"     "$WORK/ws-clone/.lodestar/source.json" kind local
 expect_json "records version"  "$WORK/ws-clone/.lodestar/source.json" version "$VERSION"
 check "clone re-run (update mode)" 0 "$ROOT/install.sh" "$WORK/ws-clone"
 
+# --- source.json must survive an origin that is not shell-safe (issue #35) -----------
+# `origin` is a filesystem path on a clone install and a hand-set $LODESTAR_REPO on a
+# remote one. Either can carry a quote or a backslash — a WSL path, a directory someone
+# named oddly, a fork URL. Interpolating that into a heredoc produced invalid JSON, which
+# /lodestar-update cannot read; the write succeeds and the failure surfaces much later.
+ODD="$WORK/od\"d dir"
+mkdir -p "$ODD"
+cp -R "$ROOT/kit" "$ROOT/install.sh" "$ROOT/VERSION" "$ODD/"
+mkdir -p "$WORK/ws-odd"
+check "install from a path with a space and a quote" 0 "$ODD/install.sh" "$WORK/ws-odd"
+expect_json "odd-path origin round-trips" "$WORK/ws-odd/.lodestar/source.json" origin "$ODD"
+expect_json "odd-path kind"               "$WORK/ws-odd/.lodestar/source.json" kind local
+
 # generated content must survive an update
 mkdir -p "$WORK/ws-clone/.claude/guardrails"
 echo "mine" > "$WORK/ws-clone/.claude/guardrails/custom.md"
