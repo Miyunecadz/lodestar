@@ -14,7 +14,13 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 for the tags. validate.py checks each CHANGELOG heading's release
+      # status against the actual `v*` tags, and checkout fetches none by default — the
+      # check would find an empty tag set and silently skip, which is the failure mode it
+      # exists to prevent.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Discovered, not listed. The hand-maintained list had drifted: it missed
       # kit/templates/hooks/lodestar-graph-refresh.sh — the one shell script installed

@@ -4,13 +4,15 @@
 Checks, with stdlib only:
   - every guardrail has the required frontmatter, valid enums, and a compilable regex;
   - every agent/skill has the required frontmatter;
-  - VERSION matches the top CHANGELOG entry.
+  - VERSION matches the top CHANGELOG entry;
+  - every CHANGELOG heading's release status matches the actual git tags.
 Exits non-zero (listing every problem) if anything is off.
 """
 import os
 import re
 import sys
 import glob
+import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 errors = []
@@ -162,6 +164,25 @@ def check_catalog_listed():
             errors.append(f"kit/catalog/CATALOG.md does not list skill '{name}'")
 
 
+def git_tags():
+    """Every `vX.Y.Z` tag in this checkout, as a set of bare versions.
+
+    Returns None when git cannot answer — a shallow clone, a tarball, no git. Release
+    status is then unverifiable, and the check skips rather than inventing failures.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "tag", "--list", "v*"], cwd=ROOT, timeout=10,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    out = proc.stdout.decode("utf-8", "replace")
+    return {t[1:] for t in out.split() if re.fullmatch(r"v\d+\.\d+\.\d+", t)}
+
+
 def check_version():
     vpath = os.path.join(ROOT, "VERSION")
     cpath = os.path.join(ROOT, "CHANGELOG.md")
@@ -172,10 +193,49 @@ def check_version():
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         errors.append(f"VERSION is not semver: {version!r}")
     text = open(cpath).read() if os.path.exists(cpath) else ""
-    m = re.search(r"^##\s*\[(\d+\.\d+\.\d+)\]", text, re.M)
-    top = m.group(1) if m else None
+    headings = re.findall(r"^##\s*\[(\d+\.\d+\.\d+)\]\s*(.*)$", text, re.M)
+    top = headings[0][0] if headings else None
     if top != version:
         errors.append(f"VERSION ({version}) != top CHANGELOG entry ({top}) — bump both together")
+
+    # Release status is a mechanically checkable claim, and it drifted: every heading
+    # read "Unreleased" including twelve published versions, which release.yml then
+    # copied verbatim into the GitHub Release notes (issue #33).
+    tags = git_tags()
+    if not tags:
+        # None = git could not answer; empty = a shallow or --no-tags clone, or a
+        # tarball. Either way release status is unverifiable, and asserting against an
+        # empty tag set would report every published version as never released. CI uses
+        # fetch-depth: 0 so this path is not how the check passes there.
+        print("note: no v* tags in this checkout — skipping the release-status check")
+        return
+    for index, (ver, suffix) in enumerate(headings):
+        suffix = suffix.strip()
+        dated = re.fullmatch(r"—\s*\d{4}-\d{2}-\d{2}", suffix)
+        pending = re.fullmatch(r"—\s*Unreleased", suffix)
+        never = re.fullmatch(r"—\s*not released", suffix)
+        if index == 0:
+            if not pending:
+                errors.append(
+                    f"CHANGELOG [{ver}] is the top entry and must read '— Unreleased', not {suffix!r}"
+                )
+            if ver in tags:
+                errors.append(
+                    f"CHANGELOG [{ver}] is the top entry but v{ver} is already tagged — "
+                    "bump VERSION and open a new section (this is how 0.8.0/0.9.0 were skipped)"
+                )
+            continue
+        if ver in tags:
+            if not dated:
+                errors.append(
+                    f"CHANGELOG [{ver}] is tagged as v{ver} but its heading reads {suffix!r} — "
+                    "it must carry the release date (YYYY-MM-DD)"
+                )
+        elif not never:
+            errors.append(
+                f"CHANGELOG [{ver}] has no v{ver} tag, so it must read '— not released', "
+                f"not {suffix!r} — an uncut version must not look pending"
+            )
 
 
 def main():
