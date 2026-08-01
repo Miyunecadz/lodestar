@@ -4,7 +4,27 @@ All notable changes to Lodestar are documented here.
 
 Headings carry the release date. `— Unreleased` marks the version in development (always the top entry, matching `VERSION`). `— not released` marks a version that was written up but never cut — see 0.8.0 / 0.9.0 below. `validate.py` enforces all three.
 
-## [0.18.0] — Unreleased
+## [0.19.0] — Unreleased
+
+A rule file is written for two readers, and every block sent both of them everything. The model got the redirect it needs to act on, plus paragraphs on why the rule chose its enforcement surface and how `match: argv` tokenises shell words — then the whole thing again in a second JSON field. Closes #30.
+
+`docs/CONCEPTS.md` §2 sets the standard: *"a good block doesn't say 'denied,' it says 'don't edit an applied migration — create a new one with `db:new`.' Redirect, don't just refuse."* The output did redirect, then buried the redirect under design notes addressed to somebody else.
+
+Measured on `block-destructive-commands`, the issue's example: **3310 → 807 characters**, a 4.1× cut. The model's payload alone went 1655 → 742.
+
+### Changed
+- **A bare `---` line in a rule body splits the block-time redirect from the author-facing rationale.** Both halves stay in the file — the rationale is still there for anyone who opens the rule — but only the part above the separator is sent when the rule fires. All 21 catalog rules migrated: block payloads total 22746 → 9615 characters, now 223–829 each (mean 457) where they were 298–2411.
+- **The two output fields carry different payloads instead of the same one twice.** They have different readers: `permissionDecisionReason` goes to the model and carries the redirect, `systemMessage` goes to the **user** and is now a one-line "Lodestar blocked this action — `<rule>`".
+
+### Added
+- **`validate.py` caps the block-time payload at 900 characters**, so the discipline is enforced rather than intended. A rule whose message is empty above the separator also fails.
+- **Engine cases** for the split: the redirect reaches the model, the rationale does not, the user is told which rule fired in one line, and a rule with **no** separator still sends its whole body — older and hand-written rule files keep working unchanged.
+- **`redirect_of` added to `test-hook-parity.py`**, since it is now duplicated across both enforcement hooks like the other helpers.
+
+### Note on the proposed fix
+The issue proposed sending `permissionDecisionReason` **or** `systemMessage`, "not both — `permissionDecision: deny` already surfaces the reason". That is not right, and implementing it would have been a regression: per the [hooks reference](https://code.claude.com/docs/en/hooks), `permissionDecisionReason` is shown to **Claude** and `systemMessage` is the field shown to the **user**. Dropping the latter would leave a blocked user with no explanation at all. Both are kept; what changed is that they no longer carry the same thousand-character body. The suggested ~600-character budget was also raised to 900 — the well-written redirects land up to 829, and cutting to 600 would mean deleting things the model needs.
+
+## [0.18.0] — 2026-08-01
 
 Every `CHANGELOG.md` heading said `— Unreleased`, including the twelve versions that are tagged and published. Closes #33.
 

@@ -67,6 +67,19 @@ AS_LIST_CASES = [
     True, False, 0, 1, {"k": "v"},
 ]
 
+REDIRECT_CASES = [
+    "just a redirect",
+    "redirect\n\n---\n\nrationale",
+    "redirect\n\n---\n\nrationale\n\n---\n\nmore",   # first separator wins
+    "redirect\n---\nrationale",                      # no blank lines around it
+    "redirect\n\n  ---  \n\nrationale",              # padded separator
+    "redirect with an inline --- dash run",          # not a separator: not its own line
+    "-----BEGIN PRIVATE KEY-----\n\n---\n\nwhy",     # longer dash runs are not separators
+    "---\n\nrationale only",                         # empty redirect
+    "",
+    "  \n\n  ",
+]
+
 SURFACES_CASES = [
     {}, {"surface": "agent"}, {"surface": "commit"}, {"surface": "permission"},
     {"surface": "both"}, {"surface": ["agent"]}, {"surface": ["both", "permission"]},
@@ -109,6 +122,7 @@ def main():
         ("coerce", COERCE_CASES),
         ("as_list", AS_LIST_CASES),
         ("surfaces_of", SURFACES_CASES),
+        ("redirect_of", REDIRECT_CASES),
     ]
 
     failures, compared = [], 0

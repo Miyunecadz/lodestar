@@ -14,6 +14,8 @@ emits: rule
 
 Real `.env` files hold live credentials and must never be read or written by the assistant. Use a committed template (`.env.example`, `.env.sample`, `.env.template`, `.env.dist`, `.env.defaults`) to learn the expected variable shape instead — those template suffixes are excluded by the negative lookahead, while `.env` and real per-tier files like `.env.local` / `.env.production` are blocked. The lookahead checks the **end** of the name, so a per-tier template (`.env.local.example`, `.env.staging.sample`) is allowed too — the earlier pattern only excused a bare `.env.example` and blocked those.
 
+---
+
 **Surfaces: `agent`, `commit`, `permission` — three mechanisms, because no one of them covers the whole rule.**
 
 - **`permission`** — `permissions.deny` entries stop a **`Read`**, which the PreToolUse engine cannot see at all (it is registered for `Bash|Edit|Write|MultiEdit`). This is the half that makes "never read" true rather than advisory.

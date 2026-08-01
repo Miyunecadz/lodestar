@@ -4,6 +4,7 @@
 Checks, with stdlib only:
   - every guardrail has the required frontmatter, valid enums, and a compilable regex;
   - every agent/skill has the required frontmatter;
+  - every guardrail's block-time message fits the redirect budget;
   - VERSION matches the top CHANGELOG entry;
   - every CHANGELOG heading's release status matches the actual git tags.
 Exits non-zero (listing every problem) if anything is off.
@@ -181,6 +182,48 @@ def git_tags():
         return None
     out = proc.stdout.decode("utf-8", "replace")
     return {t[1:] for t in out.split() if re.fullmatch(r"v\d+\.\d+\.\d+", t)}
+# Ceiling on the part of a rule body that reaches the model when the rule fires. Issue
+# #30 suggested ~600; the well-written redirects actually land between 223 and 829, and
+# trimming to 600 would mean deleting things the model needs to act on. 900 sits above
+# every current rule and well below where they started (1500–2400), so it cannot be met
+# by accident but does catch a slide back to pasting rationale into the payload.
+REDIRECT_BUDGET = 900
+
+
+def redirect_of(body):
+    """The block-time payload: everything above the first bare `---` line in the body."""
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == "---":
+            return "\n".join(lines[:i]).strip()
+    return body.strip()
+
+
+def check_redirect_budget():
+    """A rule's block-time message must stay short enough to read as an instruction.
+
+    `docs/CONCEPTS.md` §2: "a good block doesn't say 'denied,' it says 'don't edit an
+    applied migration — create a new one with `db:new`.' Redirect, don't just refuse."
+    A redirect buried under design rationale still redirects, technically.
+    """
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
+        name = os.path.basename(path)[:-3]
+        text = open(path).read()
+        parts = text.split("---", 2)
+        if len(parts) < 3:
+            continue  # frontmatter check reports this separately
+        payload = redirect_of(parts[2].strip())
+        if not payload:
+            errors.append(
+                f"guardrail '{name}' has an empty block message — the text above the "
+                "`---` separator is what the model is shown"
+            )
+        elif len(payload) > REDIRECT_BUDGET:
+            errors.append(
+                f"guardrail '{name}' block message is {len(payload)} chars, over the "
+                f"{REDIRECT_BUDGET} budget — move design rationale below a `---` line; "
+                "it stays in the file, it just stops being sent on every block"
+            )
 
 
 def check_version():
@@ -238,12 +281,14 @@ def check_version():
             )
 
 
+
 def main():
     check_guardrails()
     check_agents()
     check_skills()
     check_catalog_totals()
     check_catalog_listed()
+    check_redirect_budget()
     check_version()
     if errors:
         print("❌ validation failed:")

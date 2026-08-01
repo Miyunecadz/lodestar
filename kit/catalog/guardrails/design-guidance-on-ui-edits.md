@@ -23,6 +23,8 @@ Install it once and this reminder goes away:
 
 Then delegate UI work to the `ui-designer` agent rather than editing components directly — that agent loads the design skill first, which is the point.
 
+---
+
 **Why this fires at all:** a `PreToolUse` hook cannot see which skills are loaded in the current session, so it does not try to. It checks the workspace's recorded state instead — `designGuidance.installed` in `.claude/lodestar.manifest.json` — via `requires_manifest_missing`. That makes it **self-silencing**: once guidance is installed and recorded it never fires again, and if you decline the plugin it keeps reminding you rather than going quiet forever. A no-manifest workspace gets the reminder too, since failing toward visible is the whole point of the rule.
 
 Severity is `warn`, not `block`: design quality is a judgement, and a hook that refused UI edits over an unproven aesthetic claim would be wrong. **Surface: `agent`** — it is guidance for the assistant, not a property of a commit.
