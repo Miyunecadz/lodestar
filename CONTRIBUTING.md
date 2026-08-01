@@ -64,6 +64,7 @@ find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck --sev
 python3 .github/scripts/validate.py          # catalog frontmatter + VERSION↔CHANGELOG
 python3 .github/scripts/test-hook-parity.py  # the duplicated hook helpers still agree
 bash   .github/scripts/test-engine.sh        # guardrail engine (agent surface)
+python3 .github/scripts/test-catalog.py      # the REAL catalog rules vs their fixtures
 bash   .github/scripts/test-install.sh       # installer: clone, bootstrap, pinning, refusals
 bash   .github/scripts/test-precommit.sh     # commit surface: staged-diff enforcement
 bash   .github/scripts/test-coverage.sh      # graph completeness: on-disk code vs graph nodes
