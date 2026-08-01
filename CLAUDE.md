@@ -80,9 +80,11 @@ those paths, never this repo's `kit/…`.
   the `Totals: **N entries**` line updated; and `docs/EXTENDING.md` updated for any new
   flag, surface, or stack detector.
 - Guardrail frontmatter enums: `severity: block|warn`, `event: file|bash|all`,
-  `emits: rule|settings-hook`, `surface: agent|commit|both`; `pattern` must compile.
-  `surface: commit|both` also needs `commit_check: staged-paths|secret-scan|default-branch`
-  or `event: file`.
+  `emits: rule|settings-hook`; `pattern` must compile. `surface` takes one value or a
+  list — `agent`, `commit`, `permission`, or the legacy scalar `both` (= `[agent,
+  commit]`). A rule naming `commit` also needs `commit_check:
+  staged-paths|secret-scan|default-branch` or `event: file`; a rule naming `permission`
+  also needs a non-empty `permission_rules` list of `Tool(pattern)` entries.
 - **One rule set, three enforcement surfaces**, and they are not interchangeable. The
   PreToolUse engine is registered for `Bash|Edit|Write|MultiEdit`, so it cannot see a
   `Read` at all — "never read this" is only true on the `permission` surface. A rule body

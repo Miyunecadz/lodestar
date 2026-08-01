@@ -1,0 +1,10 @@
+# mise config for Lodestar.
+# Loads gitignored `.env` into the shell environment so tools like `gh`
+# pick up GH_TOKEN automatically. Secrets live in `.env` (gitignored),
+# never here — this file holds no values and is safe to commit.
+# Optional: nothing in the repo requires mise.
+
+[env]
+# Export every key from `.env`, including GH_TOKEN, into the environment.
+# gh reads GH_TOKEN directly for auth (no `gh auth login` needed).
+_.file = ".env"
