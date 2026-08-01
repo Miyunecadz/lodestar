@@ -2,6 +2,23 @@
 
 All notable changes to Lodestar are documented here.
 
+## [0.16.0] — Unreleased
+
+Four small hardening fixes. Individually minor; together they close the gaps where a shipped file is unbounded, unparseable, or unlinted. Closes #31, #35, #38, #34.
+
+### Fixed
+- **The PreToolUse hook is registered with `"timeout": 5`** (#31). A `command` hook with no timeout inherits Claude Code's **600-second** default, and this one fires on `Bash|Edit|Write|MultiEdit` — effectively every action, so a wedged invocation stalls a tool call for ten minutes and looks exactly like Claude Code freezing. The engine already caps its own git subprocesses at 2s, but that covers neither interpreter startup on a cold or network filesystem nor a `glob` over a rules directory on a stalled mount. Measured latency is ~25 ms with eight rules, so the ceiling has roughly 200× headroom. `/lodestar-guardrails` now also adds the field to an existing registration that lacks one, since a spec change alone only helps new installs.
+- **`install.sh` writes `.lodestar/source.json` with a JSON encoder** (#35). The heredoc interpolated `$SOURCE_ORIGIN` unescaped — a filesystem path on a clone install, a hand-set `$LODESTAR_REPO` on a remote one. One `"` or `\` in either produced invalid JSON, which `/lodestar-update` cannot read; the write succeeded and the failure surfaced much later during an unrelated operation.
+- **The candidate-path guard in `lodestar-graph-refresh.sh` now fires** (#38). `[ -n "${cand#/}" ]` was meant to skip an unset `LODESTAR_GRAPHIFY_OUT`, but it strips the leading slash from `/graph.json`, gets a non-empty `graph.json`, and never skips — so the loop stat'd the filesystem root. `${VAR:+…}` yields an empty string when unset, which the existing guard then drops correctly. Harmless in practice, but a stray `/graph.json` would have been copied into a user's commit.
+
+### Changed
+- **CI shellchecks every `.sh` in the repo, discovered rather than listed** (#34). The hand-maintained list had drifted past `kit/templates/hooks/lodestar-graph-refresh.sh` — the one shell script installed into users' git-hook managers, which runs on **every commit** and `git add`s into it. The highest-reach script in the repo was the only one not linted, and the dead guard above is exactly what a linter pass invites you to notice. `.github/rulesets/apply.sh` and `test-engine.sh` are now covered too; all pass at `--severity=error`.
+- **`CONTRIBUTING.md` and `docs/CI.md`** carry the same discovered invocation, so the local command cannot drift from CI again.
+
+### Added
+- **`test-graph-refresh.sh`** (new CI gate, 16 checks) — the first test of any kind for `lodestar-graph-refresh.sh`. graphify is stubbed via `LODESTAR_GRAPHIFY_BIN`, so it needs no graphify install. It pins the contract that hook cannot break: it never fails a commit (missing tool, failing tool, no manifest, no artifacts, unrelated staged files) and stages exactly the artifacts it found and nothing else. Having no test is how the dead guard survived; shellcheck alone would not have caught the `git add` behaviour either way.
+- **`test-install.sh` installs from a path containing a space and a quote** and asserts `source.json` parses and `origin` round-trips exactly.
+
 ## [0.15.0] — Unreleased
 
 The commit-surface secret scan treated **any** non-zero exit from `gitleaks` as "secrets found". A gitleaks *invocation* failure — a removed subcommand, a malformed `.gitleaks.toml`, an unsupported flag after an upgrade — therefore blocked the commit with usage text presented as leaked credentials. Because `scan-secrets-before-commit` sets `commit_severity: block`, that stopped every committer on the team, including teammates who never use Claude, and CI. Closes #24.

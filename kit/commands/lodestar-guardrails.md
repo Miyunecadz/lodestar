@@ -43,13 +43,15 @@ Lodestar enforces `emits: rule` guardrails with its own **self-contained engine*
         {
           "matcher": "Bash|Edit|Write|MultiEdit",
           "hooks": [
-            { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-guardrails.py\"" }
+            { "type": "command", "timeout": 5, "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-guardrails.py\"" }
           ]
         }
       ]
     }
   }
   ```
+  **`timeout` is not optional here.** A `command` hook with no timeout inherits Claude Code's 600-second default, and this hook fires on `Bash|Edit|Write|MultiEdit` — effectively every action. A wedged invocation would stall a tool call for ten minutes, indistinguishable from Claude Code being frozen. The engine caps its own git subprocesses at 2s, but that does not cover interpreter startup on a cold or network filesystem, or a `glob` over a rules directory on a stalled mount. Normal latency is ~30ms, so 5 seconds is enormous headroom.
+- **If a registration already exists without a `timeout`, add it** — the field is what bounds the never-raise guarantee from the outside, and an install predating it is otherwise unbounded. This is the only edit to make to an existing entry; leave the command string and matcher alone.
 The engine reads every rule in `.claude/guardrails/*.md` on each matching tool call: `block` rules deny the action (with the redirect message); `warn` rules surface the message without stopping. `file` rules match the edited **path**; `bash` rules match the **command**.
 
 Rules can also opt into a **context layer** the engine computes per invocation (git tracked-status and branch, the target repo's stacks from the manifest, shell-word tokenization) — that is what makes `stacks:` actually scope a rule and lets a migration guard allow the file you just created. Every probe fails protective: no git, no manifest, or an unparseable command means the rule behaves as a plain pattern match. See `docs/EXTENDING.md` for the flags.

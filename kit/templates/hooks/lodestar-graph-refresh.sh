@@ -92,12 +92,17 @@ copy_artifacts() {
   staged_any=0
   for art in graph.json GRAPH_REPORT.md graph.html; do
     src=""
+    # `${VAR:+…}` yields the empty string when the override is unset, so the guard below
+    # actually drops the entry. The previous spelling was `${LODESTAR_GRAPHIFY_OUT:-}/$art`
+    # guarded by `[ -n "${cand#/}" ]`, which strips the leading slash from `/graph.json`,
+    # gets a non-empty `graph.json`, and never skips — so the loop stat'd the filesystem
+    # root. Harmless in practice, but a stray /graph.json would land in someone's commit.
     for cand in \
-      "${LODESTAR_GRAPHIFY_OUT:-}/$art" \
+      "${LODESTAR_GRAPHIFY_OUT:+${LODESTAR_GRAPHIFY_OUT}/$art}" \
       "$repo_abs/graphify-out/$art" \
       "$GIT_ROOT/graphify-out/$art" \
       "$repo_abs/$art"; do
-      [ -n "${cand#/}" ] || continue
+      [ -n "$cand" ] || continue
       if [ -f "$cand" ]; then src="$cand"; break; fi
     done
     [ -n "$src" ] || continue
