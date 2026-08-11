@@ -45,7 +45,7 @@ Everything else is `agent`-only, each for a stated reason in its body — usuall
 | agent | `security-auditor` | read-only deep security audit (adaptive: backends/APIs) |
 | agent | `docs-writer` | keep docs/ & `_shared/` in sync with code changes |
 | agent | `feature-planner` | decompose a feature into role-sized tasks |
-| agent | `feature-orchestrator` | plan + dispatch specialist roles across repos |
+| agent | `feature-orchestrator` | order a feature's tasks by repo, role, and parallelism — no dispatch |
 | agent | `implementer` | cohesive multi-file change bounded to one feature |
 | skill | `planning-workflow` | when scoping/spec'ing, before code |
 | skill | `architecture-overview` | big-picture / cross-repo flow tracing |
