@@ -34,10 +34,15 @@ Copy stack-agnostic skills from `.lodestar/catalog/skills/` into `./.claude/skil
 Do NOT copy stack-scoped skills here — those are added per repo by `/lodestar-onboard`.
 
 ## 6. Write the manifest
+Read `.lodestar/VERSION` — the version `install.sh` recorded — and write it as `version`.
+Do not hardcode a literal here: it would pin every workspace initialised from this spec to
+whatever release the spec was last edited in, which is the one thing `version` exists to
+tell you. If the file is missing, write `"unknown"` and say so.
+
 Create `./.claude/lodestar.manifest.json`:
 ```json
 {
-  "version": "0.4.0",
+  "version": "<contents of .lodestar/VERSION>",
   "placement": "<personal|git-workspace>",
   "repos": [],
   "skills": ["planning-workflow", "architecture-overview"],
