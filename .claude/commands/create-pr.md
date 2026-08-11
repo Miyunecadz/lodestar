@@ -7,12 +7,18 @@ argument-hint: <issue number or slug — the handoff file to open the PR from>
 
 Target: **$ARGUMENTS**
 
-This is the **only** stage that commits, pushes, or opens a PR. Stages 1 and 2 are
-forbidden from doing any of it, so PR creation has exactly one home.
+This is the **only** command that commits, pushes, or opens a PR. `/implement-ticket`,
+`/review-ticket`, and `/pr-review` are all forbidden from doing any of it, so PR creation
+has exactly one home.
+
+Note what this means in practice: `.claude/settings.json` allows `git status|diff|log|
+branch|switch` and `gh pr|issue`, but **not** `git add`, `git commit`, or `git push`. Those
+three will prompt. That is the design — the human is in the loop at the mutation, not
+before it.
 
 ## 1 — Gate
 
-Read `.claude/handoff/<issue-or-slug>.md`. All four must be recorded:
+Read `.claude/handoff/<issue>.md`. All four must be recorded:
 
 ```
 Issue Analysis  = APPROVED
@@ -25,8 +31,11 @@ Any one missing, absent, or contradicted → **stop** and name which. Do not inf
 from a clean diff, a green gate run, or the user asking for a PR. An unrecorded stage is an
 unrun stage.
 
+`Review = CHANGES_REQUIRED` is a hard stop, not a warning to note in the PR body. Do not
+open the PR "so the findings can be discussed there".
+
 Confirm the working tree still matches what was reviewed: `git status --short` and
-`git diff`. Uncommitted changes beyond the reviewed diff send it back to `/dev-review` —
+`git diff`. Uncommitted changes beyond the reviewed diff send it back to `/review-ticket` —
 they were never reviewed.
 
 ## 2 — Branch, fragment, commit
@@ -60,4 +69,9 @@ Open a **draft** PR unless the user asked otherwise, with `gh pr create`. The bo
 
 All of that is already in the handoff file. Copy it across; do not re-derive it.
 
-CI is the required check. Report the PR URL and the check status; do not merge.
+CI is the required check. Report the PR URL and the check status; **do not merge.**
+
+## 4 — Record
+
+Append the PR number and URL to the handoff file. `/pr-review` needs the number, and it is
+the last thing this stage knows that the next one cannot cheaply find.

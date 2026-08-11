@@ -28,6 +28,10 @@ The caller gives you a handoff file (ticket, analysis verdict, acceptance criter
 implementation report) and a diff range. If either is missing, say what is missing and stop
 — reviewing against a remembered ticket is how a review approves the wrong thing.
 
+The range may be local (`main...HEAD`, `--cached`) or a pull request's
+(`<base>...<head-sha>`). Review whatever you were given and name it in your report; do not
+substitute a range you find more convenient.
+
 Read the diff **and the surrounding context of every file it touches**, not just the hunks.
 
 ## 1 — Route by what changed

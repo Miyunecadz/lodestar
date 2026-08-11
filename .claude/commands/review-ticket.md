@@ -3,25 +3,30 @@ description: Stage 2 — independently review an implemented change against its 
 argument-hint: <issue number or slug — the handoff file to review against>
 ---
 
-# Stage 2 — review
+# Stage 2 — review the implementation
 
 Target: **$ARGUMENTS**
 
-Stage 1 completing is not evidence the change is right. Review it independently.
+Answers one question: **did the implementation correctly solve the approved ticket?** Whether
+the final PR is safe to merge is `/pr-review`'s question, not this one.
+
+`/implement-ticket` completing is not evidence the change is right. Review it independently.
 
 ## 1 — Load the record, or stop
 
-Read `.claude/handoff/<issue-or-slug>.md` for the ticket, the analysis verdict, the
+Read `.claude/handoff/<issue>.md` for the ticket, the analysis verdict, the
 acceptance criteria, and the implementation report.
 
 Missing file, or no recorded acceptance criteria → **stop**. Report what is missing and
-send it back to `/dev-implement`. Do not reconstruct a ticket from the diff: that
+send it back to `/implement-ticket`. Do not reconstruct a ticket from the diff: that
 reviews the change against itself and approves anything self-consistent.
 
 Analysis gate is `NOT_APPROVED` but a change exists → report that as a BLOCKER and stop.
 
 Establish the diff range — `git diff main...HEAD` for branch work, `--cached` for staged.
-State which you used.
+State which you used, and record `git rev-parse HEAD`. `/pr-review` compares that SHA
+against the PR head to tell whether this review still describes the code, so an unrecorded
+SHA forces it to re-review everything from scratch.
 
 ## 2 — Review, in parallel
 
@@ -65,13 +70,14 @@ Report every finding in the reviewers' own form — `Severity · Location · Pro
 matters · Recommended correction` — ranked by impact. Merge duplicates that both reviewers
 raised into one.
 
-**Do not fix what you found.** Return the findings; the fix is a new `/dev-implement`
+**Do not fix what you found.** Return the findings; the fix is a new `/implement-ticket`
 pass or a direct instruction from the user. A reviewer that patches its own findings has
 stopped being a second opinion.
 
 ## 5 — Record
 
-Append verdict, findings, and the criteria checklist to the handoff file, then return the
-same. `/dev-pr` reads it and refuses to run without `APPROVED`.
+Append verdict, findings, the criteria checklist, and the reviewed SHA to the handoff file,
+then return the same. `/create-pr` reads it and refuses to run without `APPROVED`.
 
-**Do not commit, push, or open a PR.**
+**Do not commit, push, or open a PR.** On `CHANGES_REQUIRED` the next step is a fix, not a
+PR — and `/create-pr` will refuse anyway.
