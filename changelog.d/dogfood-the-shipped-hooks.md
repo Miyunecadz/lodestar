@@ -44,3 +44,9 @@ cost, most of what the two on-demand skills already own.
   (`test-hook-parity.py`, `test-catalog.py`, `test-graph-refresh.sh`) so a full local gate
   run no longer prompts partway through.
 - `CONTRIBUTING.md` no longer hardcodes a gate count.
+
+### Added
+- `.claude/skills/github-issue-necessity-analysis` — a dev-only skill that treats an issue
+  as a claim to verify against the code rather than an instruction to implement, and
+  returns a verdict with `path:line` evidence. Dev tooling, not catalog: `install.sh`
+  copies only from `kit/`, so it ships to nobody.

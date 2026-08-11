@@ -45,9 +45,10 @@ and runs the lot; `kit-boundary-reviewer` (agent) checks the invariants CI canno
 - `docs/EXTENDING.md` — context flags, surface semantics, engine invariants.
 - `CONTRIBUTING.md` — clone-time setup and the local gate commands.
 
-Two skills carry the detail and load when the task matches: `catalog-entry-authoring`
-(anything under `kit/catalog/`) and `hook-engine-invariants` (anything under
-`kit/templates/hooks/`). Do not restate them here.
+Skills carry the detail and load when the task matches — `catalog-entry-authoring`
+(anything under `kit/catalog/`), `hook-engine-invariants` (anything under
+`kit/templates/hooks/`), `github-issue-necessity-analysis` (is this issue worth doing?).
+Do not restate them here.
 
 ## Code Style
 

@@ -19,7 +19,7 @@ So contributors can drop `.claude/agents/`, `.claude/skills/`, `.claude/workflow
 | `guardrails/` | four dogfooded rules — this repo runs its own product against itself. Installed copies of the catalog entries of the same name, produced by the picker's transform (`id:` → `name:` + `enabled: true`); re-derive them from `kit/catalog/guardrails/` rather than hand-editing, or they drift out of the product |
 | `hooks/dev-*.py` | **dev-only**, no kit equivalent: run `validate.py` after a catalog edit and `shellcheck` after a shell edit, so a CI failure surfaces at the edit instead of at push |
 | `agents/` | `gate-runner` (run every CI gate, report only failures), `kit-boundary-reviewer` (the invariants CI cannot check) |
-| `skills/` | `catalog-entry-authoring`, `hook-engine-invariants` — loaded on demand when a task matches |
+| `skills/` | `catalog-entry-authoring`, `hook-engine-invariants`, `github-issue-necessity-analysis` — loaded on demand when a task matches |
 | `lodestar.manifest.json` | records which deny entries `lodestar-permissions.py` owns; **do not hand-edit** |
 
 **Dogfooding is the point.** A guardrail that misfires here is a bug in the catalog entry
