@@ -18,7 +18,7 @@ You decompose a feature into an ordered plan of small, role-sized tasks across r
 **Done-condition:** an ordered task list where each task is tagged with a **target repo** and a **role** (the agent that should do it).
 
 1. Load the `planning-workflow` skill and follow it.
-2. Read `docs/_shared/` (the API contract — the cross-repo spine), `docs/repo-map.md`, and the relevant per-repo `architecture/graph.json` to see how the pieces connect.
+2. Read `docs/_shared/` (the API contract — the cross-repo spine), `docs/repo-map.md`, and the relevant repo's architecture map (`graph.json` or `overview.md` — see `architecture-overview`) to see how the pieces connect.
 3. Break the feature into the smallest tasks that still have a crisp done-condition. Tag each with its repo and the role that fits (`migration-writer`, `resolver-writer`, `implementer`, `test-writer`, …), and order them by dependency.
 
 Output the plan and stop. No Edit/Write, no dispatching — that is the orchestrator's job.
