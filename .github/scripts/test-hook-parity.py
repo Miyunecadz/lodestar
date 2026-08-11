@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Assert the frontmatter helpers duplicated across the three hooks stay in agreement.
+"""Assert the frontmatter helpers duplicated across the hooks stay in agreement.
+
+FILES below is the list of hooks that carry a copy — a hook reading rule files joins it,
+which is what stops a fourth or fifth copy drifting unwatched.
 
 The duplication is deliberate — see `.claude/skills/hook-engine-invariants`: each hook
 must work when copied into `.claude/hooks/` alone, so there is no shared module to
@@ -30,6 +33,7 @@ FILES = [
     "lodestar-guardrails.py",
     "lodestar-precommit-check.py",
     "lodestar-permissions.py",
+    "lodestar-rule-check.py",
 ]
 
 # Inputs chosen for the edges where a hand-rolled parser drifts: empty and whitespace

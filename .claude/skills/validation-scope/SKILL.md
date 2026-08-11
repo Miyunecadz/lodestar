@@ -34,12 +34,15 @@ stale, re-derive it from the scripts and fix the table; never trust it over the 
 | `kit/templates/hooks/lodestar-guardrails.py` | `test-engine.sh`, `test-catalog.py`, `test-hook-parity.py`, **floor** |
 | `kit/templates/hooks/lodestar-precommit-check.py` | `test-precommit.sh`, `test-hook-parity.py`, `test-engine.sh`, **floor** |
 | `kit/templates/hooks/lodestar-permissions.py` | `test-permissions.sh`, `test-hook-parity.py`, `test-engine.sh` |
+| `kit/templates/hooks/lodestar-rule-check.py` | `test-rule-check.sh`, `test-hook-parity.py`, `test-engine.sh`, `validate.py` — it gates the checker's `COMPARED` list |
 | `kit/templates/hooks/lodestar-graph-coverage.py` | `test-coverage.sh`, `test-engine.sh` |
 | `kit/templates/hooks/lodestar-freshness-check.py` | `test-freshness.sh`, `test-engine.sh` |
 | `kit/templates/hooks/lodestar-graph-refresh.sh` | `shellcheck`, `test-graph-refresh.sh` |
 | `VERSION`, `CHANGELOG.md`, `changelog.d/**` | `validate.py`; `VERSION` also `test-install.sh` |
 | adding/renaming/deleting anything under `kit/` | `test-install.sh` (it asserts the installed layout) |
 | `.github/scripts/test-*.sh`, `.github/scripts/test-*.py`, `validate.py` | the gate that script *is*, plus `shellcheck` if it is a `*.sh` |
+| `.github/scripts/test-catalog.py` | `test-catalog.py`, plus `test-rule-check.sh` (it installs rules through this file's transform) and `validate.py` (it gates this file's `COPIED` list) |
+| `kit/commands/lodestar-guardrails.md` | `validate.py` — it checks §5 names every field the hooks read |
 | `.github/scripts/release.py` | **no gate runs it** — see below |
 | `.github/workflows/ci.yml` | the full suite — the gate list itself changed |
 
@@ -90,12 +93,19 @@ list means *no gate exercises the file's behaviour*; it never means a `*.sh` her
 `shellcheck`. Read a row as: the union of every row a path matches, and only then check
 whether what remains is ungated.
 
-Two of these bite in particular:
+Two exceptions carved out of that list, both narrow:
 
-- `kit/commands/**` — a spec's paths are only wrong once installed. No gate catches it.
-- `.claude/guardrails/**` — installed copies of catalog entries. Drift from
-  `kit/catalog/guardrails/` means this repo dogfoods something it does not ship, and no
-  gate compares them.
+- `kit/commands/lodestar-guardrails.md` §5 — `validate.py` now checks that the section names
+  every frontmatter field the hooks read, because a field it omits is a field the picker
+  drops. The rest of that spec, and every other command spec, is still ungated.
+- `.claude/guardrails/**` — `test-rule-check.sh` compares this repo's installed rules
+  against `kit/catalog/guardrails/`, so dogfooding a rule the repo does not ship now fails
+  CI. Nothing else in `.claude/**` is gated.
+
+One that still bites:
+
+- `kit/commands/**` — a spec's paths are only wrong once installed. No gate catches it, and
+  the §5 field check above is one line of one spec, not coverage of the specs.
 
 ## Running them
 

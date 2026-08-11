@@ -260,7 +260,7 @@ Resolving a staged path against the workspace names a file that exists under no 
 
 Frontmatter parsing is deliberately minimal: scalars and inline lists (`[a, b]`) only. A regex containing a comma cannot go in a list value — use a single scalar pattern instead.
 
-The parser, `coerce`, `as_list`, and `surfaces_of` are **duplicated across all three hooks on purpose** — each must work when copied into `.claude/hooks/` alone, with no shared module to import. The cost of that is exactly the bug above: one rule file, two parsers, scoped differently by each. `test-hook-parity.py` is what keeps the cost bounded — it feeds one corpus through every hook's copy and fails when they disagree. When you change one, change them all and let that gate confirm it; do not extract a shared module.
+The parser, `coerce`, `as_list`, and `surfaces_of` are **duplicated across every hook that reads a rule file, on purpose** — each must work when copied into `.claude/hooks/` alone, with no shared module to import. `test-hook-parity.py`'s `FILES` is the list of them. The cost of that is exactly the bug above: one rule file, two parsers, scoped differently by each. `test-hook-parity.py` is what keeps the cost bounded — it feeds one corpus through every hook's copy and fails when they disagree. When you change one, change them all and let that gate confirm it; do not extract a shared module.
 
 `file` rules see the edited path; add `match: content` to test the edited text instead. The engine is registered for `Bash|Edit|Write|MultiEdit`, so a **hook** rule still cannot intercept a `Read` — a rule body promising "never read this" needs the `permission` surface above to be an enforced stop rather than a note to the model.
 

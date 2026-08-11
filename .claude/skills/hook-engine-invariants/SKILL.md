@@ -1,24 +1,39 @@
 ---
 name: hook-engine-invariants
-description: The safety invariants for Lodestar's hook scripts — the guardrail engine, the pre-commit checker, and the permission applier. Apply when editing anything in kit/templates/hooks/, when adding a context probe or frontmatter flag to a hook, or when reasoning about hook exit codes and failure modes.
+description: The safety invariants for Lodestar's hook scripts — the guardrail engine, the pre-commit checker, the permission applier, and the rule-drift checker. Apply when editing anything in kit/templates/hooks/, when adding a context probe or frontmatter flag to a hook, or when reasoning about hook exit codes and failure modes.
 user-invocable: false
 ---
 
 # Hook invariants
 
-These three scripts run inside other people's workspaces on every matching action. A bug
-here is not a failed test — it is a workspace where nothing can be done.
+These scripts run inside other people's workspaces. Most of what they do is **intercept** —
+they fire on an action someone else took, and a bug there is not a failed test, it is a
+workspace where nothing can be done.
 
 | Script | Surface | Trigger |
 |---|---|---|
 | `lodestar-guardrails.py` | agent | PreToolUse, matcher `Bash\|Edit\|Write\|MultiEdit` |
 | `lodestar-precommit-check.py` | commit | git `pre-commit` |
 | `lodestar-permissions.py` | permission | run once by the picker; merges `permissions.deny` |
+| `lodestar-rule-check.py` | none — it reports drift | on demand, by `/lodestar-update` or by hand |
+
+The axis for exit codes below is not which surface a script serves, but **who asked**.
+Interception must never punish someone who did not ask: it allows, and it reports. A mode
+someone invoked deliberately to be told something — `--check` — owes them an honest exit
+status instead. Two files have such a mode, and both use exit 1 for it.
 
 ## Non-negotiable
 
-1. **Never raise.** Every entry point wraps `main()` and exits 0 in a `finally`. An
-   uncaught exception in a PreToolUse hook blocks every tool call in the workspace.
+1. **Never raise, and never break an action you intercepted.** Every entry point wraps
+   `main()` and exits 0 in a `finally`. An uncaught exception in a PreToolUse hook blocks
+   every tool call in the workspace.
+
+   The exception is a `--check` mode, which exists to answer a question and so must answer
+   honestly: `lodestar-permissions.py --check` exits 1 on settings drift, and
+   `lodestar-rule-check.py --check` exits 1 on rule drift **or on an internal error** — the
+   two differ deliberately, because the second is the one whose silence would read as "no
+   drift" about a scan that never ran, which is permissive failure by another name (see
+   invariant 2). Neither file's interception path is affected: both still exit 0 there.
 2. **Fail protective, not permissive.** Every context probe is best-effort. No git, no
    manifest, a detached HEAD, an unparseable command → fall back to behaving as a plain
    pattern match, or stay silent for a probe that *adds* blocking. Never let an
@@ -27,8 +42,9 @@ here is not a failed test — it is a workspace where nothing can be done.
 3. **Stdlib only.** No third-party imports, ever. The kit's promise is Python 3 and
    nothing else.
 4. **Single self-contained file.** Each hook must work when copied into `.claude/hooks/`
-   alone. The frontmatter parser is duplicated across all three **on purpose** — do not
-   factor it into a shared module.
+   alone. The frontmatter parser is duplicated across every hook that reads a rule file
+   **on purpose** — do not factor it into a shared module. `test-hook-parity.py`'s `FILES`
+   is the list of those hooks; adding one there is what keeps a new copy honest.
 5. **Never hang.** Subprocess calls take a timeout (`GIT_TIMEOUT = 2` in the engine). A
    hook that hangs is worse than one that fails.
 6. **The commit hook exits 1 only on a `block` match.** Missing tool, unreadable
@@ -65,5 +81,10 @@ single command; callers must stay protective on `None`.
 ## Before you finish
 
 Add a case for each surface touched — `test-engine.sh` (agent), `test-precommit.sh`
-(commit), `test-permissions.sh` (permission). A new flag also needs a row in the
+(commit), `test-permissions.sh` (permission), `test-rule-check.sh` (rule drift). A **new
+frontmatter flag** is not done when the hook reads it: the picker has to copy it into the
+installed rule, so it also belongs in `/lodestar-guardrails` §5, in `test-catalog.py`'s
+`COPIED`, and in `lodestar-rule-check.py`'s `COMPARED`. `validate.py` fails if you miss one
+— that check exists because this was missed once (`requires_manifest_missing`, PR #64). A
+new flag also needs a row in the
 `docs/EXTENDING.md` table.

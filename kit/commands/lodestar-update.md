@@ -57,6 +57,11 @@ Run the installer for the target version. Never hand-copy files yourself — `in
 - Show old → new version (and say "rollback" if it went backwards).
 - Summarize notable changes for the new version from the fetched `CHANGELOG.md`. If a section has an **Upgrading** note, surface it — that's where "re-run this command to adopt the fix" lives.
 - Compare the refreshed catalog against the manifest's enabled ids: list any **new catalog entries** (guardrails / agents / skills) now available that the workspace hasn't adopted. This is the key value — the user won't see new rules/agents until they opt in.
+- **Then report the rules the workspace already adopted whose catalog source has since changed.** New entries are only half of it: an installed rule in `.claude/guardrails/` was copied once and is never reconciled, so a corrected pattern sits in the refreshed catalog while the file that actually enforces stays as it was. Do not eyeball this — run the shipped checker, which reads both sides:
+  ```bash
+  python3 .lodestar/templates/hooks/lodestar-rule-check.py
+  ```
+  It prints each drifted rule with the field, the installed value, and the catalog value. Relay that verbatim rather than summarising it — which field moved is the whole content of the report. **Never edit an installed rule to "fix" the drift**: the checker cannot tell a stale copy from a deliberate local edit (adding an env tier to `permission_rules` is documented practice), and neither can you. Adoption is re-running `/lodestar-guardrails` and re-ticking that rule, which is the user's call.
 - Recommend the follow-ups only where relevant:
   - New or changed **guardrails** → re-run `/lodestar-guardrails` and tick them.
   - New or changed **agents** → re-run `/lodestar-agents`.
