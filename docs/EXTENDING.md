@@ -13,10 +13,48 @@ Everything in Lodestar is a plain file. Adding capability means adding a catalog
    - `event` + `pattern` — the engine trigger (`file` events match the edited path; `bash` events match the command).
    - `emits: rule` for declarative rules (enforced by the bundled engine); `emits: settings-hook` only if it needs custom shell logic.
 3. Write a message body that **redirects to the right action**, not just "denied." Put the redirect first, then a bare `---` line, then the design rationale — see below.
-4. Re-run `/lodestar-guardrails` and tick your new rule.
-3. Write a message body that **redirects to the right action**, not just "denied."
-4. **Add fixtures** to `.github/fixtures/guardrails.tsv` — at least one case showing it fires and one showing what it must not match. CI rejects a guardrail with neither.
-5. Re-run `/lodestar-guardrails` and tick your new rule.
+4. **Check it with `--explain`** against inputs it must and must not match — see below.
+5. **Add fixtures** to `.github/fixtures/guardrails.tsv` — at least one case showing it fires and one showing what it must not match. CI rejects a guardrail with neither.
+6. Re-run `/lodestar-guardrails` and tick your new rule.
+
+### The authoring loop: `--explain`
+
+Install the rule, then ask the engine what it does. This is the recommended inner loop — seconds per iteration, no live session, and safe for a rule whose whole job is to block something destructive:
+
+```bash
+python3 .claude/hooks/lodestar-guardrails.py --explain --bash 'rm -rf /tmp/scratch'
+python3 .claude/hooks/lodestar-guardrails.py --explain --file api/.env.local.example
+```
+
+```
+input     bash: rm -rf /tmp/scratch
+rules     1 applying to a bash event, from /w/.claude/guardrails
+
+block-destructive-commands  [block]
+  field       argv     rm -rf /tmp/scratch
+  pattern     matched  (\brm\s+-[a-zA-Z]*[rf]|\bgit\s+reset\s+--hard)
+  probe       allow_paths — operands ['/tmp/scratch']
+  verdict     ALLOW — matched, then suppressed by `allow_paths`
+
+verdict   ALLOW
+```
+
+The last two lines are the point. **Why a rule did *not* fire is invisible in normal use** — a pattern that never matched and a match silenced by a context flag look identical from the outside, and they need opposite fixes. `--explain` names the flag.
+
+| Flag | What it does |
+|---|---|
+| `--bash '<command>'` | explain a Bash command |
+| `--file <path>` | explain an `Edit`/`Write` on that path |
+| `--content '<text>'` | with `--file`: the edited text, for a `match: content` rule |
+| `--rule <name>` | narrow to one rule; exits 1 if no enabled `agent` rule has that name |
+| `--json` | machine-readable — the same trace, plus the overall verdict |
+
+Two things it deliberately does:
+
+- **Reads the installed rules, not the catalog.** It loads `$CLAUDE_PROJECT_DIR/.claude/guardrails/`, so it explains the rule *as the picker installed it* — which is what enforces. A rule that lost a context field on install shows up here as behaviour, not as a diff.
+- **Shares one code path with the hook.** Both go through `evaluate()`, so the explanation cannot drift from the decision. `test-engine.sh` asserts they agree on the same input; an explainer describing an engine nobody runs would be worse than none.
+
+It writes nothing and needs no session — every probe it consults is a read.
 
 ### Behaviour fixtures
 

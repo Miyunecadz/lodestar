@@ -45,6 +45,18 @@ A rule also declares which mechanisms enforce it. This engine only ever runs the
 the permission surface existed nothing declared a non-agent surface, so this engine
 ignored the field entirely and ran every rule it found.
 
+Run with `--explain` instead of hook input to ask what the installed rules would do to
+one input, without a live session and without installing anything destructive to try it:
+
+    lodestar-guardrails.py --explain --bash 'rm -rf /tmp/scratch'
+    lodestar-guardrails.py --explain --file api/.env.example --rule block-env-files
+    lodestar-guardrails.py --explain --bash 'git push --force' --json
+
+It reports, per rule, whether the pattern matched, which context probes were consulted and
+what each answered, and — the part invisible in normal use — which flag suppressed a match.
+The mode is read-only and shares `evaluate()` with the hook path, so it describes the engine
+that is actually enforcing rather than a second implementation of it.
+
 Design notes:
 - Python 3.8+, stdlib only. See MIN_PYTHON below — an interpreter under the floor is
   reported loudly rather than silently allowing everything.
@@ -466,36 +478,67 @@ def scope_for(event: str, tool_input: dict) -> str:
     return tool_input.get("file_path", "")
 
 
-def stack_allows(rule: dict, ctx: Context, scope: str) -> bool:
-    """Is this rule in scope for the repo the action targets?"""
+def stack_allows(rule: dict, ctx: Context, scope: str, probes=None) -> bool:
+    """Is this rule in scope for the repo the action targets?
+
+    `probes` is an optional list `--explain` passes in to collect what the context layer
+    was asked and what it answered. Appending to it must never change the decision.
+    """
     stacks = as_list(rule.get("stacks"))
     if not stacks or "all" in stacks:
         return True
     repo_stacks = ctx.stacks_for(scope)
+    if probes is not None:
+        probes.append(("stacks", "rule wants %s; target repo reports %s" % (
+            stacks, "nothing — unknown repo, rule kept" if repo_stacks is None else repo_stacks)))
     if repo_stacks is None:
         return True  # unknown repo → do not silently drop the rule
     return any(s in repo_stacks for s in stacks)
 
 
-def suppressed(rule: dict, ctx: Context, event: str, tool_input: dict) -> bool:
-    """Does the context say this match should not fire after all?"""
+def suppression_of(rule: dict, ctx: Context, event: str, tool_input: dict, probes=None):
+    """The context flag that says this match must not fire after all, or None.
+
+    Returns the flag's *name* rather than a bare True so `--explain` can report which one
+    went quiet — the interesting question when a rule does not fire. Truthiness is
+    unchanged (a name is truthy, None is falsy), so the enforcing path reads it exactly as
+    it read the old boolean.
+    """
     needs_missing = rule.get("requires_manifest_missing")
-    if needs_missing and not ctx.manifest_missing(needs_missing):
-        return True  # the thing this rule reminds about is recorded — stay quiet
+    if needs_missing:
+        missing = ctx.manifest_missing(needs_missing)
+        if probes is not None:
+            probes.append(("requires_manifest_missing", "manifest `%s` is %s" % (
+                needs_missing, "absent/false — rule still applies" if missing else "recorded")))
+        if not missing:
+            return "requires_manifest_missing"  # the gap this reminds about is closed
 
     if event == "file":
         if rule.get("allow_if_untracked") is True:
             path = tool_input.get("file_path", "")
-            if path and not ctx.is_tracked(path):
-                return True
-        return False
+            tracked = ctx.is_tracked(path) if path else None
+            if probes is not None:
+                probes.append(("allow_if_untracked", "git %s" % (
+                    "has no path to check" if tracked is None
+                    else "tracks this file" if tracked else "does not track this file")))
+            if path and not tracked:
+                return "allow_if_untracked"
+        return None
 
     # bash
-    if rule.get("only_on_default_branch") is True and not ctx.on_default_branch:
-        return True
+    if rule.get("only_on_default_branch") is True:
+        on_default = ctx.on_default_branch
+        if probes is not None:
+            probes.append(("only_on_default_branch", "HEAD is %s, default is %s" % (
+                ctx.branch or "detached/unknown", ctx.default_branch or "undeterminable")))
+        if not on_default:
+            return "only_on_default_branch"
     allow_paths = as_list(rule.get("allow_paths"))
     if allow_paths:
         operands = command_operands(tool_input.get("command", ""))
+        if probes is not None:
+            probes.append(("allow_paths", "operands %s" % (
+                "unparseable or compound — rule kept" if operands is None else operands)))
         # Only an *absolute* operand can be checked against an allow prefix. A relative
         # path would have to be resolved against cwd, which would exempt every relative
         # delete whenever the workspace itself sits under an allowed prefix.
@@ -503,21 +546,89 @@ def suppressed(rule: dict, ctx: Context, event: str, tool_input: dict) -> bool:
             resolved = [os.path.expanduser(o) for o in operands]
             try:
                 if all(any(re.search(a, r) for a in allow_paths) for r in resolved):
-                    return True
+                    return "allow_paths"
             except re.error:
-                return False
-    return False
+                return None
+    return None
 
 
-def matches(rule: dict, event: str, target: str, command: str) -> bool:
-    flags = 0 if rule.get("ignore_case") is False else re.IGNORECASE
-    haystacks = [target]
+def haystacks_for(rule: dict, event: str, target: str, command: str):
+    """The strings a rule's pattern is actually tested against."""
     if event == "bash" and rule.get("match") == "argv":
-        haystacks = command_targets(command)
+        return command_targets(command)
+    return [target]
+
+
+def matches(rule: dict, haystacks) -> bool:
+    """Does the rule's pattern hit any of the strings it is tested against?
+
+    Takes the haystacks rather than deriving them, so a caller that also needs to *show*
+    them (`--explain`) does not pay for `command_targets()` twice — it re-parses the shell
+    words of every command, on the latency path of every tool call.
+    """
+    flags = 0 if rule.get("ignore_case") is False else re.IGNORECASE
     try:
         return any(re.search(rule["pattern"], h, flags) for h in haystacks)
     except re.error:
         return False
+
+
+def evaluate(rules, ctx: Context, event: str, tool_input: dict, command: str, scope: str,
+             probes: bool = False):
+    """Every rule's outcome for one action, in the order the engine asks the questions.
+
+    One trace dict per rule. The hook path reads `outcome` and `severity` and ignores the
+    rest; `--explain` prints all of it. Both go through here deliberately — an explainer
+    that re-implemented the decision would describe an engine that is not the one
+    enforcing, which is worse than no explainer.
+
+    `outcome` is one of:
+
+        no-target      the rule's field is empty for this input (nothing to test)
+        out-of-scope   `stacks` does not cover the repo the action targets
+        no-match       the pattern did not match
+        suppressed     it matched, and a context flag said not to fire (`suppressed_by`)
+        fires          it matched and nothing suppressed it
+    """
+    traces = []
+    for rule in rules:
+        target = field_for(rule, event, tool_input)
+        trace = {
+            "rule": str(rule.get("name") or "rule"),
+            "severity": str(rule.get("severity") or rule.get("action") or "warn").lower(),
+            "pattern": str(rule.get("pattern") or ""),
+            "field": ("content" if rule.get("match") == "content"
+                      else "argv" if (event == "bash" and rule.get("match") == "argv")
+                      else "command" if event == "bash" else "path"),
+            "target": target,
+            "haystacks": [],
+            "probes": [] if probes else None,
+            "suppressed_by": None,
+            "outcome": "",
+            "message": rule.get("_message", ""),
+        }
+        collect = trace["probes"]
+        if not target:
+            trace["outcome"] = "no-target"
+        elif not stack_allows(rule, ctx, scope, collect):
+            trace["outcome"] = "out-of-scope"
+        else:
+            trace["haystacks"] = haystacks_for(rule, event, target, command)
+            if not matches(rule, trace["haystacks"]):
+                trace["outcome"] = "no-match"
+            else:
+                flag = suppression_of(rule, ctx, event, tool_input, collect)
+                trace["suppressed_by"] = flag
+                trace["outcome"] = "suppressed" if flag else "fires"
+        traces.append(trace)
+    return traces
+
+
+def firing(traces):
+    """(blocking, warning) — the traces that fire, split by severity. Block wins."""
+    fires = [t for t in traces if t["outcome"] == "fires"]
+    return ([t for t in fires if t["severity"] == "block"],
+            [t for t in fires if t["severity"] != "block"])
 
 
 def main():
@@ -549,19 +660,7 @@ def main():
         print(json.dumps({"systemMessage": not_enforcing(str(e))}))
         return
 
-    blocking, warning = [], []
-    for rule in rules:
-        target = field_for(rule, event, tool_input)
-        if not target:
-            continue
-        if not stack_allows(rule, ctx, scope):
-            continue
-        if not matches(rule, event, target, command):
-            continue
-        if suppressed(rule, ctx, event, tool_input):
-            continue
-        severity = str(rule.get("severity") or rule.get("action") or "warn").lower()
-        (blocking if severity == "block" else warning).append(rule)
+    blocking, warning = firing(evaluate(rules, ctx, event, tool_input, command, scope))
 
     if blocking:
         # The two fields have different readers, so they carry different payloads.
@@ -571,8 +670,8 @@ def main():
         # not a wall of instructions addressed to someone else. Sending the same body
         # to both was the duplication; sending only one would leave the user with an
         # unexplained block.
-        msg = "\n\n".join(f"**[{r.get('name','rule')}]**\n{r['_message']}" for r in blocking)
-        names = ", ".join(str(r.get("name", "rule")) for r in blocking)
+        msg = "\n\n".join("**[%s]**\n%s" % (t["rule"], t["message"]) for t in blocking)
+        names = ", ".join(t["rule"] for t in blocking)
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": hook_event,
@@ -582,13 +681,125 @@ def main():
             "systemMessage": "Lodestar blocked this action — %s. See Claude's redirect above." % names,
         }))
     elif warning:
-        msg = "\n\n".join(f"**[{r.get('name','rule')}]**\n{r['_message']}" for r in warning)
+        msg = "\n\n".join("**[%s]**\n%s" % (t["rule"], t["message"]) for t in warning)
         print(json.dumps({"systemMessage": msg}))
     else:
         print("{}")
 
 
+OUTCOME_LABEL = {
+    "no-target": "ALLOW — no %s to test in this input",
+    "out-of-scope": "ALLOW — out of scope for this repo's stacks",
+    "no-match": "ALLOW — pattern did not match",
+    "suppressed": "ALLOW — matched, then suppressed by `%s`",
+    "fires": "FIRES — %s",
+}
+
+
+def render(traces, header, as_json: bool):
+    """`--explain` output. Returns the text to print; never touches the filesystem."""
+    blocking, warning = firing(traces)
+    verdict = "DENY" if blocking else ("WARN" if warning else "ALLOW")
+    if as_json:
+        return json.dumps({"input": header, "verdict": verdict, "rules": traces}, indent=2)
+
+    lines = ["input     %s: %s" % (header["event"], header["input"]),
+             "rules     %d applying to a %s event, from %s"
+             % (len(traces), header["event"], header["rules_dir"]), ""]
+    for t in sorted(traces, key=lambda t: (t["outcome"] != "fires", t["rule"])):
+        lines.append("%s  [%s]" % (t["rule"], t["severity"]))
+        lines.append("  field       %-8s %s" % (t["field"], t["target"] or "(empty)"))
+        if t["outcome"] not in ("no-target", "out-of-scope"):
+            lines.append("  pattern     %-8s %s" % (
+                "matched" if t["outcome"] != "no-match" else "no match", t["pattern"]))
+            if t["haystacks"] != [t["target"]]:
+                lines.append("  tested      %s" % (t["haystacks"],))
+        for name, detail in (t["probes"] or []):
+            lines.append("  probe       %s — %s" % (name, detail))
+        if t["outcome"] == "no-target":
+            lines.append("  verdict     " + OUTCOME_LABEL[t["outcome"]] % t["field"])
+        elif t["outcome"] == "suppressed":
+            lines.append("  verdict     " + OUTCOME_LABEL[t["outcome"]] % t["suppressed_by"])
+        elif t["outcome"] == "fires":
+            lines.append("  verdict     " + OUTCOME_LABEL[t["outcome"]] % (
+                "denies the action" if t["severity"] == "block" else "advises only"))
+        else:
+            lines.append("  verdict     " + OUTCOME_LABEL[t["outcome"]])
+        lines.append("")
+    lines.append("verdict   %s%s" % (verdict, "" if verdict == "ALLOW" else " — %s" % ", ".join(
+        t["rule"] for t in (blocking or warning))))
+    return "\n".join(lines)
+
+
+def explain(argv) -> int:
+    """Answer "what would the installed rules do to this input" without a live session.
+
+    Read-only by construction: it loads the same rule files the hook loads, asks the same
+    context layer the same questions (every git probe is a read), and writes nothing. The
+    point is the *why* — a rule that does not fire is invisible in normal use, and which
+    flag silenced it is the thing a rule author actually needs to see.
+    """
+    import argparse  # imported here, not at module scope: the hook path must stay cheap
+
+    p = argparse.ArgumentParser(
+        prog=os.path.basename(sys.argv[0]),
+        description="Explain what the installed guardrails would do to one input.")
+    p.add_argument("--explain", action="store_true", help="select this mode (required)")
+    p.add_argument("--bash", metavar="COMMAND", help="explain a Bash command")
+    p.add_argument("--file", metavar="PATH", help="explain an Edit/Write on this path")
+    p.add_argument("--content", metavar="TEXT",
+                   help="with --file: the edited text, for `match: content` rules")
+    p.add_argument("--rule", metavar="ID", help="narrow to the rule with this name")
+    p.add_argument("--json", action="store_true", help="machine-readable output")
+    args = p.parse_args(argv)
+
+    if (args.bash is None) == (args.file is None):
+        p.error("give exactly one of --bash or --file")
+    if args.content is not None and args.file is None:
+        p.error("--content applies to --file only")
+
+    if args.bash is not None:
+        event, tool_input, shown = "bash", {"command": args.bash}, args.bash
+    else:
+        event, shown = "file", args.file
+        tool_input = {"file_path": args.file}
+        if args.content is not None:
+            tool_input["content"] = args.content
+
+    try:
+        rules = load_rules(event)
+    except RuleSetError as e:
+        sys.stderr.write("lodestar-guardrails: %s\n" % e)
+        return 1
+
+    if args.rule:
+        rules = [r for r in rules if str(r.get("name") or "") == args.rule]
+        if not rules:
+            sys.stderr.write(
+                "lodestar-guardrails: no enabled agent-surface rule named %r for event %r "
+                "in %s\n" % (args.rule, event, rules_dir()))
+            return 1
+
+    ctx = Context(tool_input, os.getcwd())
+    traces = evaluate(rules, ctx, event, tool_input,
+                      tool_input.get("command", ""), scope_for(event, tool_input),
+                      probes=True)
+    print(render(traces, {"event": event, "input": shown, "rules_dir": rules_dir()}, args.json))
+    return 0
+
+
 if __name__ == "__main__":
+    # `--explain` is a human-facing mode, so it reports errors on stderr and exits
+    # non-zero. It is dispatched before the hook wrapper below, which must keep answering
+    # in JSON and exiting 0 whatever happens. A no-argument invocation — the only way
+    # Claude Code calls this file — never reaches here.
+    if "--explain" in sys.argv[1:]:
+        if sys.version_info < MIN_PYTHON:
+            sys.stderr.write("lodestar-guardrails: needs Python %d.%d+, this is %s\n"
+                             % (MIN_PYTHON[0], MIN_PYTHON[1], "%d.%d.%d" % sys.version_info[:3]))
+            sys.exit(1)
+        sys.exit(explain(sys.argv[1:]))
+
     try:
         if sys.version_info < MIN_PYTHON:
             # Checked before anything else runs: on an interpreter under the floor the
