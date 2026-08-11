@@ -135,6 +135,7 @@ Detected via `python-django`, `python`, `drf`, `has-pytest`, `has-python-lint`.
 | `templates/hooks/lodestar-precommit-check.py` | commit-surface guardrail enforcement for any committer (`/lodestar-guardrails`) |
 | `templates/hooks/lodestar-graph-coverage.py` | graph **completeness** assertion: on-disk code vs graph nodes (`/lodestar-onboard`, `/lodestar-refresh`) |
 | `templates/hooks/lodestar-permissions.py` | permission surface: merges rule `permission_rules` into `settings.json` `permissions.deny` (`/lodestar-guardrails`) |
+| `templates/hooks/lodestar-rule-check.py` | reports installed rules whose catalog source has since changed — an adopted rule is never refreshed, so a corrected pattern does not reach the file enforcing it (`/lodestar-update`) |
 | `templates/git/gitattributes-graphify` | union-merge `.gitattributes` for `graph.json` (`/lodestar-freshness`) |
 | `templates/mcp/*.mcp.json` | per-workspace MCP server sets |
 

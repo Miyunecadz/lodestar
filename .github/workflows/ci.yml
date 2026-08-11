@@ -47,6 +47,12 @@ jobs:
       - name: Install the catalog skills and check what lands
         run: python3 .github/scripts/test-skill-install.py
 
+      # An installed rule is written once and never reconciled, so a corrected catalog
+      # pattern does not reach the file that enforces it. This drives the checker that
+      # reports that, against rules installed through the picker's own transform.
+      - name: Smoke-test the installed-rule drift checker
+        run: bash .github/scripts/test-rule-check.sh
+
       - name: Smoke-test the installer
         run: bash .github/scripts/test-install.sh
 

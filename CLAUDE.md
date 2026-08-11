@@ -45,7 +45,8 @@ content here, or anything the ownership list below assigns to another file.
 
 - Hooks and scripts: **Python 3 stdlib only**, and each hook stays a single
   self-contained file — a user copies it into `.claude/hooks/` alone. The frontmatter
-  parser is duplicated across the three hooks on purpose.
+  parser is duplicated across every hook that reads a rule file, on purpose;
+  `test-hook-parity.py` names them and keeps the copies in agreement.
 - Shell must pass `shellcheck --severity=error`.
 - Adding capability means adding a catalog entry, not changing code.
 - Template placeholders (`REPO`, `<WORKSPACE_NAME>`) are intentional — do not "fix" them.

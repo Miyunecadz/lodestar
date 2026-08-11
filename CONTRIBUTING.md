@@ -65,17 +65,22 @@ than a remembered count, which has gone stale more than once. As of now that is:
 
 ```bash
 find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck --severity=error
-python3 .github/scripts/validate.py          # catalog frontmatter + VERSION↔CHANGELOG
-python3 .github/scripts/test-hook-parity.py  # the duplicated hook helpers still agree
-bash   .github/scripts/test-engine.sh        # guardrail engine (agent surface)
-python3 .github/scripts/test-catalog.py      # the REAL catalog rules vs their fixtures
-bash   .github/scripts/test-install.sh       # installer: clone, bootstrap, pinning, refusals
-bash   .github/scripts/test-precommit.sh     # commit surface: staged-diff enforcement
-bash   .github/scripts/test-coverage.sh      # graph completeness: on-disk code vs graph nodes
-bash   .github/scripts/test-freshness.sh     # map drift, in BOTH workspace layouts
-bash   .github/scripts/test-permissions.sh   # permission surface: idempotent, reversible deny merge
-bash   .github/scripts/test-graph-refresh.sh # the pre-commit hook that stages the graph
+python3 .github/scripts/validate.py             # catalog frontmatter + VERSION↔CHANGELOG
+python3 .github/scripts/test-hook-parity.py     # the duplicated hook helpers still agree
+bash   .github/scripts/test-engine.sh           # guardrail engine (agent surface)
+python3 .github/scripts/test-catalog.py         # the REAL catalog rules vs their fixtures
+python3 .github/scripts/test-skill-install.py   # the REAL catalog skills, and the REPO substitution
+bash   .github/scripts/test-rule-check.sh       # installed rules vs the catalog they came from
+bash   .github/scripts/test-install.sh          # installer: clone, bootstrap, pinning, refusals
+bash   .github/scripts/test-precommit.sh        # commit surface: staged-diff enforcement
+bash   .github/scripts/test-coverage.sh         # graph completeness: on-disk code vs graph nodes
+bash   .github/scripts/test-freshness.sh        # map drift, in BOTH workspace layouts
+bash   .github/scripts/test-graph-refresh.sh    # the pre-commit hook that stages the graph
+bash   .github/scripts/test-permissions.sh      # permission surface: idempotent, reversible deny merge
 ```
+
+Listed in `ci.yml`'s order, so the two can be compared by eye. They have still drifted apart
+twice — read the workflow, not this block, whenever the answer matters.
 
 If you touched a hook in `kit/templates/hooks/`, also run the two enforcement suites
 against the Python floor (`MIN_PYTHON` in the hooks). CI does this in the `python-floor`

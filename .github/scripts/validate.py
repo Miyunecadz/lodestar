@@ -280,6 +280,119 @@ def check_skill_triggers():
                 "model to route on; name the distinct task each one belongs to")
 
 
+HOOKS_GLOB = "kit/templates/hooks/*.py"
+PICKER_SPEC = "kit/commands/lodestar-guardrails.md"
+
+# Every place that has to state the same list of copied frontmatter fields, and the name of
+# the literal holding it. `/lodestar-guardrails` §5 is checked separately: it is prose, so
+# membership is what can be asserted there, not equality.
+COPY_SITES = [
+    (".github/scripts/test-catalog.py", "COPIED"),
+    ("kit/templates/hooks/lodestar-rule-check.py", "COMPARED"),
+]
+
+# Frontmatter keys the hooks read that are deliberately NOT copied from the catalog entry.
+# `name` and `enabled` are written fresh by the picker (`name` from the entry's `id`), and
+# `action` is a legacy alias for `severity` the engine still tolerates but no catalog entry
+# sets. Everything else a hook reads must be copied, or the installed rule loses it.
+NOT_COPIED = {"name", "enabled", "action"}
+
+
+def hook_read_fields():
+    """Frontmatter keys the shipped hooks actually read, from their own source.
+
+    Derived, not declared — the same argument as `stack_vocabulary()` above. The hooks are
+    the only authority on which fields matter; a hand-kept list here would be a fourth
+    rival copy of the thing this check exists to keep in step.
+
+    Returns None when the scan looks broken, so a stale pattern reports itself instead of
+    validating every site against an empty set and passing.
+    """
+    found = set()
+    for path in sorted(glob.glob(os.path.join(ROOT, HOOKS_GLOB))):
+        text = open(path).read()
+        found |= set(re.findall(r"(?:rule|fm)\.get\(\s*[\"']([a-z_][a-z0-9_]*)[\"']", text))
+    found = {f for f in found if not f.startswith("_")}
+    if len(found) < 10:
+        return None
+    return found - NOT_COPIED
+
+
+def list_literal(rel, name):
+    """The string entries of a top-level `NAME = [...]` literal, or None if unparseable."""
+    path = os.path.join(ROOT, rel)
+    if not os.path.exists(path):
+        return None
+    m = re.search(r"^%s = \[(.*?)\n\]" % re.escape(name), open(path).read(), re.S | re.M)
+    if not m:
+        return None
+    entries = re.findall(r"[\"']([a-z_][a-z0-9_]*)[\"']", m.group(1))
+    return set(entries) or None
+
+
+def picker_section_five():
+    """The text of `/lodestar-guardrails` §5, or None when the heading cannot be found."""
+    path = os.path.join(ROOT, PICKER_SPEC)
+    if not os.path.exists(path):
+        return None
+    m = re.search(r"^##\s*5\.[^\n]*\n(.*?)(?=^##\s)", open(path).read(), re.S | re.M)
+    return m.group(1) if m else None
+
+
+def check_copied_fields():
+    """One list of copied fields, stated in three places, kept identical by this check.
+
+    An installed rule is written once by a model following `/lodestar-guardrails` §5 and
+    never reconciled afterwards, so a field the spec forgets to name is a field the picker
+    silently drops — and the rule enforces without its scoping, or nags forever without its
+    self-silencing. That is not hypothetical: `requires_manifest_missing` was read by the
+    engine and set by a shipped rule while §5 did not name it (PR #64), and the drift was
+    found by reading rather than by any gate. `test-catalog.py` could not see it, because it
+    copies the fields via its own list and so exercises a corrected picker.
+
+    So: the fields the hooks read are the truth, and every site that restates them must
+    agree. Equality for the two Python literals; membership for the spec, which is prose.
+    """
+    expected = hook_read_fields()
+    if expected is None:
+        errors.append(
+            f"{HOOKS_GLOB}: the `rule.get(...)` / `fm.get(...)` scan found too few "
+            "frontmatter fields to be believable — the hooks changed shape and this check "
+            "cannot run until the pattern is fixed. It is what keeps the picker's copy "
+            "list in step with what the engine reads")
+        return
+
+    for rel, name in COPY_SITES:
+        actual = list_literal(rel, name)
+        if actual is None:
+            errors.append(
+                f"{rel}: could not parse the `{name} = [...]` list — it must stay a "
+                "top-level literal of quoted field names, because it is checked against "
+                "what the hooks read")
+            continue
+        for field in sorted(expected - actual):
+            errors.append(
+                f"{rel}: `{name}` is missing {field!r}, which a shipped hook reads — an "
+                "installed rule would lose it with no error anywhere")
+        for field in sorted(actual - expected):
+            errors.append(
+                f"{rel}: `{name}` lists {field!r}, which no shipped hook reads — either it "
+                "is stale, or the hook that read it lost the read")
+
+    section = picker_section_five()
+    if section is None:
+        errors.append(
+            f"{PICKER_SPEC}: could not find the §5 heading — that section is what tells the "
+            "picker which fields to copy, and it is checked against what the hooks read")
+        return
+    for field in sorted(expected):
+        if f"`{field}`" not in section and f"`{field}:" not in section:
+            errors.append(
+                f"{PICKER_SPEC} §5 does not name `{field}`, which a shipped hook reads — a "
+                "field §5 omits is a field the picker drops, and the installed rule loses "
+                "that behaviour with no error anywhere")
+
+
 def check_catalog_totals():
     """The CATALOG.md totals line is documentation that silently goes stale — count the
     files and make CI notice when it disagrees."""
@@ -516,6 +629,7 @@ def main():
     check_skills()
     check_skill_triggers()
     check_stack_vocabulary()
+    check_copied_fields()
     check_catalog_totals()
     check_catalog_listed()
     check_fixture_coverage()

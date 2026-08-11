@@ -82,7 +82,7 @@ A **new** flag means editing the engine; `hook-engine-invariants` owns those rul
 
 ## Frontmatter parsing is minimal
 
-Scalars and inline lists (`[a, b]`) only, in all three hooks and the validator. **A regex
+Scalars and inline lists (`[a, b]`) only, in every hook and in the validator. **A regex
 containing a comma cannot go in a list value** — use a single scalar pattern.
 
 ## Then
