@@ -339,4 +339,110 @@ rm -f "$WORK"/.claude/guardrails/*.md
 # An empty rules directory is a legitimate "nothing to enforce", not a failure.
 expect "no rules at all is ALLOW, not NOT ENFORCING" ALLOW "$probe"
 
+# --- --explain: the rule-authoring loop (issue #41) ---
+# The mode exists so an author can see *why* a rule did not fire, which is invisible in
+# normal use. It shares evaluate() with the hook path, so the assertion that matters is
+# that the two agree on the same input — an explainer describing an engine nobody runs
+# would be worse than none.
+cat > "$WORK/.claude/guardrails/block-rm.md" <<'EOF'
+---
+name: block-destructive-commands
+enabled: true
+event: bash
+pattern: '(\brm\s+-[a-zA-Z]*[rf]|\bgit\s+reset\s+--hard)'
+severity: block
+match: argv
+allow_paths: ['^/tmp/', '^/var/tmp/']
+---
+Ask before deleting.
+EOF
+cat > "$WORK/.claude/guardrails/block-env-files.md" <<'EOF'
+---
+name: block-env-files
+enabled: true
+event: file
+pattern: '(^|/)\.env(?!.*\.(example|sample|template|dist|defaults)$)(\.[^/]+)?$'
+severity: block
+---
+Never edit real .env files.
+EOF
+
+explain() { "$PY" "$ENGINE" --explain "$@"; }
+agree() {  # agree "<label>" "<hook input json>" <explain args…>
+  label="$1"; hook_json="$2"; shift 2
+  want="$(printf '%s' "$hook_json" | verdict)"
+  got="$(explain --json "$@" | python3 -c 'import sys,json;print(json.load(sys.stdin)["verdict"])')"
+  if [ "$got" != "$want" ]; then
+    echo "FAIL: $label → --explain says $got, the hook says $want"; exit 1
+  fi
+  echo "ok: $label → hook and --explain both say $got"
+}
+
+agree "explain agrees: rm -rf blocked" \
+  '{"tool_name":"Bash","tool_input":{"command":"rm -rf src"}}' --bash 'rm -rf src'
+agree "explain agrees: rm -rf under an allowed prefix" \
+  '{"tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/scratch/x"}}' --bash 'rm -rf /tmp/scratch/x'
+agree "explain agrees: quoted rm -rf runs nothing" \
+  '{"tool_name":"Bash","tool_input":{"command":"echo \"rm -rf /\""}}' --bash 'echo "rm -rf /"'
+agree "explain agrees: a real .env is blocked" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"api/.env"}}' --file api/.env
+agree "explain agrees: .env.local.example is not" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"api/.env.local.example"}}' --file api/.env.local.example
+
+# The whole point of the mode: naming the flag that silenced a match. A pattern that never
+# matched and a match suppressed by context look identical from outside and need opposite
+# fixes, so these two must stay distinguishable in the output.
+if explain --bash 'rm -rf /tmp/scratch/x' | grep -q 'suppressed by `allow_paths`'; then
+  echo "ok: --explain names the flag that suppressed the match"
+else
+  echo "FAIL: --explain did not name allow_paths as the suppressor"; exit 1
+fi
+if explain --bash 'rm -rf /tmp/scratch/x' | grep -q "probe .*allow_paths — operands"; then
+  echo "ok: --explain reports what the context probe was asked"
+else
+  echo "FAIL: --explain did not report the allow_paths probe"; exit 1
+fi
+if explain --file api/.env.local.example | grep -q 'pattern     no match'; then
+  echo "ok: --explain distinguishes no-match from suppressed"
+else
+  echo "FAIL: --explain did not report a non-matching pattern as no match"; exit 1
+fi
+
+# --rule narrows, and a name that matches nothing is an error rather than empty output —
+# a typo that silently explains zero rules reads as "your rule is fine".
+if [ "$(explain --json --file api/.env --rule block-env-files | python3 -c \
+        'import sys,json;print(len(json.load(sys.stdin)["rules"]))')" = "1" ]; then
+  echo "ok: --rule narrows to one rule"
+else
+  echo "FAIL: --rule did not narrow the rule set"; exit 1
+fi
+if explain --bash 'ls' --rule no-such-rule 2>/dev/null; then
+  echo "FAIL: an unknown --rule id exited 0"; exit 1
+else
+  echo "ok: an unknown --rule id is an error, not empty output"
+fi
+if explain --bash x --file y 2>/dev/null; then
+  echo "FAIL: --bash and --file together exited 0"; exit 1
+else
+  echo "ok: --bash with --file is a usage error"
+fi
+
+# Read-only by construction (the mode may be pointed at a live workspace). Excludes .git,
+# whose internals git may touch for its own reasons.
+snapshot() { find "$WORK" -type f -not -path '*/.git/*' -exec cksum {} \; | sort; }
+before="$(snapshot)"
+explain --bash 'rm -rf src' >/dev/null
+explain --file api/.env >/dev/null
+explain --file api/Button.tsx --content 'const k = "x"' >/dev/null
+if [ "$(snapshot)" = "$before" ]; then
+  echo "ok: --explain left the workspace untouched"
+else
+  echo "FAIL: --explain modified the workspace"; exit 1
+fi
+
+# The hook path takes no arguments, and it must stay byte-identical to before the mode
+# existed — a stray argv branch reached from a PreToolUse call would break every action.
+expect "no-argument invocation still decides as a hook" DENY \
+  '{"tool_name":"Bash","tool_input":{"command":"rm -rf src"}}'
+
 echo "✅ engine smoke test passed"
