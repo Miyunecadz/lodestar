@@ -3,143 +3,116 @@ name: github-issue-necessity-analysis
 description: Investigate whether a GitHub issue actually needs to be implemented by verifying its claims against the current codebase, then return a structured verdict (IMPLEMENT / PARTIALLY REQUIRED / ALREADY IMPLEMENTED / DO NOT IMPLEMENT / NEEDS CLARIFICATION) backed by file/line evidence. Use this whenever someone asks whether an issue is valid, still relevant, worth doing, already done, obsolete, a duplicate, or should be closed, and whenever they paste an issue URL or number and ask for triage, backlog grooming, sprint planning input, or a second opinion before work starts. Do not use it when the user has already decided to implement and simply wants the code written.
 ---
 
-# GitHub Issue Necessity Analysis
+# GitHub issue necessity analysis
 
-Determine whether a GitHub issue should be worked on, by verifying its claims against the current state of the codebase.
+**An issue is a claim to investigate, not an instruction to implement.** Issues go stale,
+duplicate each other, describe fixed problems, or solve problems that do not exist. A
+report written from the issue text alone is worse than none — it looks authoritative
+while being unverified.
 
-The governing stance: **an issue is a claim to investigate, not an instruction to implement.** Issues go stale, duplicate each other, describe problems that were already fixed, or propose a solution to a problem that does not exist. The value of this analysis comes entirely from checking the claim against real code — a report written from the issue text alone is worthless and worse than no report, because it looks authoritative while being unverified.
+This skill investigates and reports. It never implements, and never mutates GitHub state
+(no closing, labelling, assigning, commenting). If asked to do either, say so in one
+sentence and offer the alternative — run the analysis first, or draft comment text the
+user posts themselves. If the issue makes no verifiable claim about a codebase (a design
+discussion), say that instead of forcing a verdict.
 
-This skill investigates and reports. It never implements the issue.
+## Step 0 — Preflight
 
-## Scope boundaries
+Both inputs are required before reading code.
 
-In scope: reading the issue and its context, locating and reading the relevant code, verifying the claim, and producing the report in `references/report-template.md`.
+**Issue content.** First method that works, verified rather than assumed — a command that
+fails silently produces a fabricated report:
 
-Out of scope — if the request is one of these, say so plainly and stop rather than partially complying:
+1. `gh issue view <number> --repo <owner/repo> --comments` (check `gh auth status` first).
+   If it returns empty, retry with `--json number,title,state,body,createdAt,labels,comments`.
+2. A connected GitHub MCP tool, if present.
+3. `web_fetch` on the URL — public repos only; a private one returns a 404 page, which is
+   not issue content.
+4. Ask the user to paste it.
 
-| Request | Response |
-| --- | --- |
-| "Implement / fix this issue" | This skill only assesses necessity. Offer to run the analysis first, or to implement without it. |
-| "Write the code once you've confirmed it's needed" | Two separate tasks. Deliver the report, then ask whether to proceed to implementation. |
-| "Close / comment on / label the issue for me" | Report only. Do not mutate GitHub state. Offer to draft comment text the user can post. |
-| "Estimate effort / write the spec / plan the sprint" | Out of scope unless it follows a completed necessity analysis the user asked to extend. |
-| General code review, or an issue with no verifiable claim about a codebase (e.g. a design discussion) | Say the issue is not the kind of claim this analysis can verify, and explain why. |
+**The codebase.** List the directory to confirm it is present and readable. Ask for a path
+if none was given.
 
-## Step 0 — Preflight (do this before any analysis)
+**Stop and report the blocker** if: issue content is unobtainable (say which methods were
+tried and what each returned); the codebase is unavailable; or the issue names a different
+repository than the one supplied (ask which is correct).
 
-Two inputs are required. Establish both before reading code.
+**Issue-text-only fallback**, only if the user explicitly authorises it: the verdict is
+capped at NEEDS CLARIFICATION, confidence at LOW, and the report opens by stating no code
+was inspected. Never issue ALREADY IMPLEMENTED or DO NOT IMPLEMENT without reading code.
 
-**1. Issue content.** Acquire in this order, stopping at the first that works. Verify availability rather than assuming — a `gh` command that fails silently produces a fabricated report.
+## 1 — Extract the claim
 
-1. `gh` CLI, if `gh auth status` succeeds: `gh issue view <number> --repo <owner/repo> --comments`. For linked context: `gh issue list --repo <owner/repo> --search "<key terms>" --state all` and `gh pr list --repo <owner/repo> --search "<key terms>" --state all`.
-2. A connected GitHub tool (MCP server or connector), if one is present in the available tools.
-3. `web_fetch` on the issue URL — public repositories only; private ones return a 404 page, which is not issue content.
-4. Ask the user to paste the issue text.
+Record separately: the **problem** claimed; the **expected behaviour** and acceptance
+criteria; the **author's proposed solution**, kept distinct — a valid problem with a poor
+proposed fix is still worth doing, and conflating them changes the verdict; **age and
+activity**; **linked work** (PRs, duplicates, related issues, and whether any merged).
 
-**2. The codebase.** Confirm the repository is actually present and readable (list the directory; do not infer its existence from the issue). If the user gave no path, ask for one.
+If the issue's own comments already resolved or redefined the problem, that is a primary
+finding.
 
-**Blocking conditions.** Stop and report the blocker instead of proceeding:
+## 2 — Locate the relevant code
 
-- Issue content unobtainable → state which acquisition methods were tried and what each returned, then ask for the issue text.
-- Codebase unavailable → state that necessity cannot be verified without it, and offer the fallback below.
-- The issue names a repository different from the one supplied → ask which is correct. Do not analyse a repository the issue is not about.
+Search outward from the issue's domain terms: identifiers, error strings, endpoint paths,
+UI labels, config keys. Read the tests covering the area — they are the fastest evidence
+that behaviour is intentional. Record `path:line` for everything you rely on.
 
-**Issue-text-only fallback.** Only if the user explicitly authorises analysis without codebase access: proceed, but the verdict is capped at **NEEDS CLARIFICATION**, confidence at **LOW**, and the report must open with a line stating no code was inspected. Never issue ALREADY IMPLEMENTED or DO NOT IMPLEMENT without having read the code.
+Keep it targeted; do not survey the repository. Stop expanding once the relevant module
+confirms or contradicts the claim. If the code genuinely cannot be found after a focused
+search, report that as Unknown — it is not licence to guess at file names.
 
-## Investigation workflow
+## 3 — Verify against the code, not the issue's assertions
 
-### Phase 1 — Extract the claim
+- Does the reported problem exist today? (confirmed / partial / contradicted / unverifiable)
+- Does the requested functionality already exist — fully, partially, or in a different form
+  that satisfies the same need?
+- Has the code changed since the issue was opened in a way that resolves it? Use
+  `git log`/`git blame` scoped to the relevant paths and the issue's creation date.
+- Is it duplicated by another issue, an open or merged PR, or an existing feature?
+- Would implementing it cause duplication, regression risk, migrations, or architectural
+  conflict?
 
-From the issue title, body, comments, labels, dates, and linked PRs/issues, record separately:
+Claims that depend on runtime, production, or environment-specific behaviour are Unknown —
+source code cannot settle them.
 
-- The **problem** claimed (what is broken or missing).
-- The **expected behaviour** and any stated acceptance criteria.
-- The **author's proposed solution**, kept distinct from the problem. The proposal is one option, not the requirement; a valid problem with a poor proposed fix is still worth doing, and this distinction changes the verdict.
-- **Age and activity**: creation date, last activity, whether comments contradict the original report or narrow it.
-- **Linked work**: referenced PRs, duplicate candidates, related issues, and whether any were merged.
+## 4 — Label every statement
 
-If the issue's own comments have already resolved or redefined the problem, that is a primary finding — carry it forward.
+**Fact** (verified in the issue or the code, with a reference) · **Inference** (drawn from
+verified evidence, presented as such) · **Unknown** (not establishable). Never state
+impact, user counts, business value, or severity as fact without evidence for it, and never
+resolve an Unknown by assumption. Issue age, label, and author are not evidence of validity.
 
-### Phase 2 — Locate the relevant code
+## 5 — Select the verdict
 
-Search from the issue's domain terms outward: identifiers, error strings, endpoint paths, UI labels, config keys. Follow entrypoints to implementation. Read tests covering the area — tests are the fastest evidence that behaviour is intentional and already specified.
+First matching rule wins:
 
-Record `path:line` for everything you rely on. Keep the search targeted; do not survey the whole repository. Stop expanding when the relevant module is understood well enough to confirm or contradict the claim.
-
-If the relevant code genuinely cannot be located after a focused search, that is a finding to report as **Unknown** — not a licence to guess at file names.
-
-### Phase 3 — Verify
-
-Answer each of these against the code, not against the issue's assertions:
-
-- Does the reported problem exist in the current code? (Confirmed / partially confirmed / contradicted / unverifiable.)
-- Does the requested functionality already exist — fully, partially, or in a different form that satisfies the same need?
-- Has the code changed since the issue was opened in a way that resolves it? Use `git log`/`git blame` scoped to the relevant paths and the issue's creation date.
-- Is this duplicated by another issue, an open or merged PR, or an existing feature?
-- Would implementing it introduce duplication, regression risk, migrations, or architectural conflict with what is already there?
-
-Where a claim depends on runtime, production, or environment-specific behaviour that source code cannot settle, mark it Unknown rather than inferring.
-
-### Phase 4 — Classify every statement
-
-Before writing, label each statement you intend to make:
-
-- **Fact** — directly verified in the issue or the code, with a reference.
-- **Inference** — a reasonable conclusion drawn from verified evidence, presented as such.
-- **Unknown** — could not be established from available evidence.
-
-Never state impact, user counts, business value, or severity as fact unless the issue or code supplies evidence for it. "Unknown" is an acceptable and expected answer.
-
-### Phase 5 — Select the verdict
-
-Apply in order; the first matching rule wins:
-
-1. Material ambiguity remains — the required change cannot be determined, or the issue contains contradictory requirements → **NEEDS CLARIFICATION**. This rule outranks the others: an unclear requirement is not a clear IMPLEMENT.
-2. Cited code fully satisfies the stated requirement → **ALREADY IMPLEMENTED**.
-3. Cited code satisfies part of it, with a specific remainder missing → **PARTIALLY REQUIRED**.
-4. The problem is contradicted by the code, obsoleted by later changes, or duplicated by a merged PR or another issue → **DO NOT IMPLEMENT**.
-5. The problem is confirmed real, the functionality is absent, and the requirement is unambiguous → **IMPLEMENT**.
+1. Material ambiguity — the required change cannot be determined, or requirements
+   contradict each other → **NEEDS CLARIFICATION**. Outranks the rest: an unclear
+   requirement is not a clear IMPLEMENT.
+2. Cited code fully satisfies the requirement → **ALREADY IMPLEMENTED**.
+3. Cited code satisfies part, with a specific remainder missing → **PARTIALLY REQUIRED**.
+4. Contradicted by the code, obsoleted by later changes, or duplicated by a merged PR or
+   another issue → **DO NOT IMPLEMENT**.
+5. Problem confirmed, functionality absent, requirement unambiguous → **IMPLEMENT**.
 
 Confidence follows the evidence, not the strength of the conclusion:
 
-- **HIGH** — issue and code both directly inspected; at least two `path:line` references support the verdict; no Unknown affects it.
-- **MEDIUM** — the primary claim was verified, but a supporting question is Unknown, or source code cannot settle runtime behaviour.
-- **LOW** — no code inspected, the relevant code was not located, or the verdict rests mainly on inference.
+- **HIGH** — issue and code both inspected; ≥2 `path:line` references support the verdict;
+  no Unknown affects it.
+- **MEDIUM** — primary claim verified, but a supporting question is Unknown, or source
+  cannot settle runtime behaviour.
+- **LOW** — no code inspected, code not located, or the verdict rests mainly on inference.
 
-### Phase 6 — Write the report
+## 6 — Write the report
 
-Use `references/report-template.md` exactly: same sections, same order, same headings. Read it before writing.
+Read `references/report-template.md` and reproduce it exactly — same sections, same order,
+all present (write "None" rather than dropping one). Every `path:line` must be a file you
+actually opened; never invent files, APIs, schemas, dependencies, or requirements.
 
-If more than one issue was supplied, analyse each independently and emit one complete report per issue in ascending issue-number order, preceded by a one-line verdict index (`#123 — DO NOT IMPLEMENT (HIGH)`). Do not merge reports; a shared root cause is noted inside each affected report.
+For multiple issues: analyse each independently, one complete report per issue in ascending
+number order, preceded by a one-line verdict index (`#123 — DO NOT IMPLEMENT (HIGH)`). Do
+not merge them; note a shared root cause inside each affected report.
 
-## Prohibited behaviours
-
-These exist because each one silently converts an investigation into an unfounded assertion:
-
-- Do not implement, edit, or refactor anything, and do not create branches, commits, or PRs.
-- Do not modify GitHub state — no closing, labelling, assigning, or commenting.
-- Do not invent file paths, line numbers, APIs, schemas, tests, metrics, or business impact. Every reference must be one you actually opened.
-- Do not treat the author's proposed solution as the requirement.
-- Do not treat issue age, label, or author seniority as evidence of validity.
-- Do not pad the report with repository-wide observations unrelated to the issue.
-- Do not resolve an Unknown by assumption.
-
-## Failure handling
-
-| Situation | Required behaviour |
-| --- | --- |
-| `gh` unavailable or unauthenticated | Fall through the acquisition order; report which methods failed. |
-| Issue is private/inaccessible | Stop; ask for pasted content. |
-| Repository path missing or unreadable | Stop; ask for the correct path. |
-| Relevant code not found after focused search | Continue; record it as Unknown and cap confidence at LOW. |
-| Issue conflicts with itself or with a linked issue | Verdict NEEDS CLARIFICATION; list the specific conflict under Missing Information. |
-| Tooling fails mid-analysis (search, git, fetch) | Report the partial analysis, state exactly which verification steps were not completed, and lower confidence accordingly. Never present a partial investigation as complete. |
-
-## Before returning the report, confirm
-
-1. Every `path:line` reference points to a file actually read in this session.
-2. Every claim is labelled Fact, Inference, or Unknown, and no Inference is written as Fact.
-3. The verdict follows from Phase 5's rules given the evidence presented.
-4. The confidence level matches the Phase 5 definition.
-5. All template sections are present, in order, including "Missing Information" (write "None" if genuinely nothing is missing).
-6. No implementation, code change, or GitHub mutation was performed.
+If a tool fails mid-analysis, report the partial analysis and state exactly which
+verification steps did not run, with confidence lowered accordingly. Never present a
+partial investigation as complete.

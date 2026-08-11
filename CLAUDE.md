@@ -35,20 +35,11 @@ and runs the lot; `kit-boundary-reviewer` (agent) checks the invariants CI canno
 
 ## Key Files
 
-- `.github/scripts/validate.py` — the catalog contract in executable form. Read it before
-  adding or renaming a frontmatter field.
-- `kit/templates/hooks/lodestar-guardrails.py` — agent surface (PreToolUse).
-- `kit/templates/hooks/lodestar-precommit-check.py` — commit surface (pre-commit).
-- `kit/templates/hooks/lodestar-permissions.py` — permission surface (merges
-  `permissions.deny` into `settings.json`).
-- `kit/catalog/CATALOG.md` — the index; every entry must appear here.
-- `docs/EXTENDING.md` — context flags, surface semantics, engine invariants.
-- `CONTRIBUTING.md` — clone-time setup and the local gate commands.
+- `kit/templates/hooks/lodestar-{guardrails,precommit-check,permissions}.py` — the agent,
+  commit, and permission surfaces, in that order.
 
-Skills carry the detail and load when the task matches — `catalog-entry-authoring`
-(anything under `kit/catalog/`), `hook-engine-invariants` (anything under
-`kit/templates/hooks/`), `github-issue-necessity-analysis` (is this issue worth doing?).
-Do not restate them here.
+Skills load on demand and their triggers are already in context. Do not restate skill
+content here, or anything the ownership list below assigns to another file.
 
 ## Code Style
 

@@ -1,8 +1,8 @@
 # Report template
 
-Reproduce this structure exactly: same headings, same order, all sections present. Bracketed text is guidance to replace, not text to emit. If a section has nothing to report, say so explicitly rather than deleting the section — a missing section is indistinguishable from an overlooked one.
-
-For multiple issues, repeat the whole template per issue under a heading `# Issue #<number> — <title>`, preceded by a verdict index.
+Bracketed text is guidance to replace, not text to emit. A section with nothing to report
+says so explicitly — a missing section is indistinguishable from an overlooked one. Per
+issue, the whole template goes under a heading `# Issue #<number> — <title>`.
 
 ---
 
