@@ -18,10 +18,13 @@ import sys
 
 TIMEOUT = 30  # validate.py is pure stdlib over ~100 files; this is generous
 
-# Any of these being touched can invalidate the catalog contract.
+# Any of these being touched can invalidate the catalog contract. Mirror what
+# validate.py actually reads — watching a path it never opens spends a subprocess to
+# re-prove an untouched result, and missing one it does read defeats the point.
 WATCHED = (
     os.path.join("kit", "catalog"),
-    os.path.join("kit", "templates"),
+    os.path.join(".github", "fixtures"),
+    "changelog.d",
     "VERSION",
     "CHANGELOG.md",
 )

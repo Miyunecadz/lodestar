@@ -64,6 +64,6 @@ single command; callers must stay protective on `None`.
 
 ## Before you finish
 
-Add a case to the gate for each surface touched — `test-engine.sh`,
-`test-precommit.sh`, `test-permissions.sh` — then run every gate `ci.yml` names. A new
-flag also needs a row in the `docs/EXTENDING.md` table.
+Add a case for each surface touched — `test-engine.sh` (agent), `test-precommit.sh`
+(commit), `test-permissions.sh` (permission). A new flag also needs a row in the
+`docs/EXTENDING.md` table.

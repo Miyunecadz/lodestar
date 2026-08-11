@@ -1,36 +1,17 @@
 # `.claude/` — this repo's own Claude Code config
 
-This folder is **Lodestar's development setup**, not part of what Lodestar ships.
-
-- **What Lodestar ships** lives under [`../kit/`](../kit/) — the catalog, templates, and
-  the `lodestar-*` command specs that `install.sh` copies into a target workspace.
-- **This folder** is for building Lodestar itself: dev-only agents, skills, workflows,
-  and settings. Anything here is safe to add without affecting the product — `install.sh`
-  only ever copies from `kit/`, never from `.claude/`.
-
-So contributors can drop `.claude/agents/`, `.claude/skills/`, `.claude/workflows/`, or a
-`settings.json` here freely. `settings.local.json` (personal, gitignored) also lives here.
-
-## What is set up
+Dev tooling for building Lodestar. Never shipped: `install.sh` copies only from
+[`../kit/`](../kit/), so anything added here is safe. Layout and clone-time setup live in
+[`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 | Path | What it does |
 |---|---|
-| `settings.json` | registers the guardrail engine (PreToolUse) and the two dev hooks (PostToolUse); holds the allow-list for the CI gates and the `permissions.deny` block |
-| `guardrails/` | four dogfooded rules — this repo runs its own product against itself. Installed copies of the catalog entries of the same name, produced by the picker's transform (`id:` → `name:` + `enabled: true`); re-derive them from `kit/catalog/guardrails/` rather than hand-editing, or they drift out of the product |
-| `hooks/dev-*.py` | **dev-only**, no kit equivalent: run `validate.py` after a catalog edit and `shellcheck` after a shell edit, so a CI failure surfaces at the edit instead of at push |
+| `settings.json` | registers the guardrail engine (PreToolUse) and the two dev hooks (PostToolUse); holds the CI-gate allow-list and the `permissions.deny` block |
+| `guardrails/` | four dogfooded rules — installed copies of the catalog entries of the same name, produced by the picker's transform (`id:` → `name:`, plus `enabled: true`). **Re-derive them from `kit/catalog/guardrails/` rather than hand-editing**, or they drift out of the product |
+| `hooks/dev-*.py` | dev-only, no kit equivalent: run `validate.py` after a catalog edit and `shellcheck` after a shell edit, so a CI failure surfaces at the edit instead of at push |
 | `agents/` | `gate-runner` (run every CI gate, report only failures), `kit-boundary-reviewer` (the invariants CI cannot check) |
-| `skills/` | `catalog-entry-authoring`, `hook-engine-invariants`, `github-issue-necessity-analysis` — loaded on demand when a task matches |
+| `skills/` | loaded on demand when a task matches |
 | `lodestar.manifest.json` | records which deny entries `lodestar-permissions.py` owns; **do not hand-edit** |
 
-**Dogfooding is the point.** A guardrail that misfires here is a bug in the catalog entry
-users will get. Three surfaces are live: the PreToolUse engine, `permissions.deny`, and
-the pre-commit checker — the last one needs wiring per clone, see
-[`../CONTRIBUTING.md`](../CONTRIBUTING.md).
-
-**The surface hooks are not copied here.** `settings.json` runs
-`kit/templates/hooks/lodestar-*.py` in place, and the pre-commit hook is copied from the
-same folder. A dev copy used to live in `hooks/`; it fell two releases behind the shipped
-engine — no gate compared them — so the repo was dogfooding a version it did not ship.
-Running the real files is the fix that cannot drift.
-
-See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the full layout.
+`settings.json` runs the **shipped** hooks in place from `kit/templates/hooks/`. There is
+deliberately no dev copy of them — see CONTRIBUTING.md for why.

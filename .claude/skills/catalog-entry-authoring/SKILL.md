@@ -69,9 +69,7 @@ cannot trip the rule) · `match: content` (file — test the edited text, not th
 `allow_paths: ['^/tmp/']` (bash) · `ignore_case: false` ·
 `requires_manifest_missing: a.b` (self-silencing reminder). Full semantics live in
 `docs/EXTENDING.md` — read it before adding a flag, and update it when you add one.
-
-Two properties to preserve: every probe **fails protective** (no git, no manifest,
-unparseable command → behave as a plain pattern match), and the engine **never raises**.
+A **new** flag means editing the engine; `hook-engine-invariants` owns those rules.
 
 ## Writing the body
 
@@ -90,5 +88,4 @@ containing a comma cannot go in a list value** — use a single scalar pattern.
 ## Then
 
 Add a case for each surface the entry touches: `test-engine.sh` (agent),
-`test-precommit.sh` (commit), `test-permissions.sh` (permission). Run every gate
-`ci.yml` names.
+`test-precommit.sh` (commit), `test-permissions.sh` (permission).
