@@ -4,6 +4,9 @@
 Checks, with stdlib only:
   - every guardrail has the required frontmatter, valid enums, and a compilable regex;
   - every agent/skill has the required frontmatter;
+  - every skill's description is a load trigger, and its body fits the size budget;
+  - no two skills that can load together share an indistinguishable trigger;
+  - every entry's `stacks` values are tags `/lodestar-onboard` §2 can detect;
   - every guardrail has positive and negative behaviour fixtures;
   - every guardrail's block-time message fits the redirect budget;
   - changelog.d/ fragments are well-formed;
@@ -15,6 +18,8 @@ import os
 import re
 import sys
 import glob
+import difflib
+import itertools
 import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -59,6 +64,71 @@ def surfaces_of(value):
         names.discard("both")
         names |= {"agent", "commit"}
     return names
+
+
+def stacks_of(value):
+    """Frontmatter `stacks` → the list of tags it names (scalar or inline list)."""
+    raw = (value or "").strip()
+    if raw.startswith("[") and raw.endswith("]"):
+        raw = raw[1:-1]
+    return [p.strip().strip('"').strip("'") for p in raw.split(",") if p.strip()]
+
+
+ONBOARD_SPEC = "kit/commands/lodestar-onboard.md"
+
+
+def stack_vocabulary():
+    """Every tag `/lodestar-onboard` §2 can actually detect, plus the `all` sentinel.
+
+    Derived, not declared. `docs/EXTENDING.md` ("Add a stack detector") makes adding the
+    detection signal step one and tagging entries step two, so that table already is the
+    vocabulary — a second hand-maintained list here would be a rival source of truth with
+    nothing keeping the two in step. This reads the spec; verifying the command's own
+    behaviour is issue #25's scope, not this check's.
+
+    Returns None when the table cannot be parsed, so the caller reports a stale parser
+    rather than validating all 50 entries against an empty set and failing every one.
+    """
+    path = os.path.join(ROOT, ONBOARD_SPEC)
+    if not os.path.exists(path):
+        return None
+    section = re.search(r"^##\s*2\.[^\n]*\n(.*?)(?=^##\s)", open(path).read(), re.S | re.M)
+    if not section:
+        return None
+    tags = set(re.findall(r"^\|.*\|\s*`([a-z0-9][a-z0-9-]*)`\s*\|\s*$", section.group(1), re.M))
+    if len(tags) < 10:
+        return None
+    return tags | {"all"}
+
+
+def check_stack_vocabulary():
+    """`stacks` values must be tags the onboarding step can actually detect.
+
+    The key's presence was already required for guardrails and agents; its values were
+    never checked, for any entry type. A typo (`react-nativ`) yields an entry that
+    installs cleanly and then matches nothing — fail-open, and unlike a guardrail that
+    stops firing there is no eventual noticing, because a pack that never activates looks
+    exactly like a repo that needed no pack.
+    """
+    vocab = stack_vocabulary()
+    if vocab is None:
+        errors.append(
+            f"{ONBOARD_SPEC}: could not parse the §2 stack-detection table — it is the "
+            "vocabulary every entry's `stacks` is checked against, so this check cannot "
+            "run until the parser or the table agree again")
+        return
+    for pattern in ("kit/catalog/guardrails/*.md", "kit/catalog/agents/*.md",
+                    "kit/catalog/skills/*/SKILL.md"):
+        for path in sorted(glob.glob(os.path.join(ROOT, pattern))):
+            rel = os.path.relpath(path, ROOT)
+            for tag in stacks_of(frontmatter(path).get("stacks")):
+                if tag not in vocab:
+                    errors.append(
+                        f"{rel}: unknown stack tag {tag!r} — no `/lodestar-onboard` §2 "
+                        f"signal detects it, so the entry would never install. Add the "
+                        f"detector first (docs/EXTENDING.md 'Add a stack detector'), and "
+                        f"check it is a `| signal | `tag` |` table row — that row "
+                        f"shape is what this vocabulary is parsed from")
 
 
 def check_guardrails():
@@ -124,13 +194,90 @@ def check_agents():
                 errors.append(f"{rel}: missing frontmatter key '{key}'")
 
 
+# A skill is a router, not a knowledge base: the body points at `docs/…` instead of
+# restating what is there. The shipped ten run 723–1593 bytes. 2000 leaves the longest of
+# them room to grow while staying out of reach by accident — past it a skill has become
+# the always-on payload the router exists to avoid. Same reasoning as REDIRECT_BUDGET
+# below, one layer up.
+SKILL_SIZE_BUDGET = 2000
+
+# Two triggers this alike are two triggers a reader cannot route between. Every pair of
+# shipped skills currently sits at or below 0.75, so 0.80 takes near-verbatim wording —
+# it cannot be met by two genuinely distinct triggers.
+TRIGGER_SIMILARITY_LIMIT = 0.80
+
+
 def check_skills():
     for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/skills/*/SKILL.md"))):
         rel = os.path.relpath(path, ROOT)
         fm = frontmatter(path)
-        for key in ("name", "description"):
+        for key in ("name", "description", "stacks"):
             if key not in fm:
                 errors.append(f"{rel}: missing frontmatter key '{key}'")
+        # `docs/CONCEPTS.md` §1: the description *is* the routing decision — the model
+        # reads an index of these triggers at startup and pulls the body only when one
+        # matches the current task. A description that summarises the skill instead of
+        # naming the task it belongs to is a skill that never loads, and nothing about
+        # that failure is visible: no error, no log, no output.
+        description = fm.get("description", "").strip()
+        if "description" in fm and not description:
+            errors.append(f"{rel}: 'description' is empty — it is the load trigger")
+        elif description and not description.lower().startswith("use when"):
+            errors.append(
+                f"{rel}: description must be a when-to-load trigger starting 'Use when', "
+                f"not a summary (got {description[:40]!r}) — see docs/EXTENDING.md "
+                "'Add a skill'")
+        size = os.path.getsize(path)
+        if size > SKILL_SIZE_BUDGET:
+            errors.append(
+                f"{rel}: {size} bytes, over the {SKILL_SIZE_BUDGET} budget — a skill "
+                "points at the docs, it does not restate them")
+
+
+def check_skill_triggers():
+    """No two skills scoped to the same stack may share an indistinguishable trigger.
+
+    Description-based routing degrades as the catalog grows: the model chooses between
+    triggers, so two that read alike make the choice arbitrary.
+
+    What is compared is exactly: pairs sharing a literal `stacks` tag, plus every pair
+    involving a `stacks: [all]` skill. That is a **lower bound on co-loading, not a
+    statement of it** — `/lodestar-onboard` §2 collects *all* matching signals, so one repo
+    carries several tags at once (a Django API with DRF gets both `python-django` and `drf`),
+    and §5 copies matched skills into the workspace's single `.claude/skills/`, so skills
+    matched by different repos sit side by side. Two skills with non-intersecting tags can
+    therefore co-exist and still not be compared here.
+
+    Same-stack is the scope issue #59 asked for ("no two enabled skills in the same stack
+    share a trigger that a reader cannot tell apart"), and it is where an indistinguishable
+    pair actually costs something: the model routing inside one stack has nothing else to go
+    on, while across stacks the tag itself already separates them.
+
+    Comparing every pair instead would flag nothing today — the highest ratio anywhere in the
+    catalog is 0.691 (`backend-standards` / `django-backend-standards`), and no pair reaches
+    the limit. It is the *next* entry that argues against it: the per-stack conventions skills
+    are one family by design ("Use when editing the <X> backend repo (REPO) — …"), they
+    already sit closest to the limit, and they are differentiated by a short decisive token
+    (which stack, which repo) rather than by sentence shape. Adding one more of them is the
+    likeliest way to produce a false positive, and a check that fires on a correct entry is a
+    check the reader learns to skip. Widen this only with that in mind.
+    """
+    entries = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/skills/*/SKILL.md"))):
+        fm = frontmatter(path)
+        description = fm.get("description", "").strip().lower()
+        if description:
+            entries.append((os.path.basename(os.path.dirname(path)),
+                            set(stacks_of(fm.get("stacks"))), description))
+    for (a_name, a_stacks, a_desc), (b_name, b_stacks, b_desc) in itertools.combinations(entries, 2):
+        if not (a_stacks & b_stacks or "all" in a_stacks or "all" in b_stacks):
+            continue
+        ratio = difflib.SequenceMatcher(None, a_desc, b_desc).ratio()
+        if ratio >= TRIGGER_SIMILARITY_LIMIT:
+            errors.append(
+                f"skills '{a_name}' and '{b_name}' can load in the same workspace and "
+                f"their descriptions are {ratio:.0%} alike — there is nothing for the "
+                "model to route on; name the distinct task each one belongs to")
 
 
 def check_catalog_totals():
@@ -367,6 +514,8 @@ def main():
     check_guardrails()
     check_agents()
     check_skills()
+    check_skill_triggers()
+    check_stack_vocabulary()
     check_catalog_totals()
     check_catalog_listed()
     check_fixture_coverage()

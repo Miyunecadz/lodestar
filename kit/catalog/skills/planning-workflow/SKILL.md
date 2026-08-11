@@ -6,7 +6,7 @@ stacks: [all]
 
 # Planning workflow
 
-Turn a feature request into a cross-repo plan. You write no code here — the point is the map, not the hands (see `docs/CONCEPTS.md` §3).
+Turn a feature request into a cross-repo plan. You write no code here — the point is the map, not the hands.
 
 **The loop:**
 

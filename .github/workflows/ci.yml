@@ -42,6 +42,11 @@ jobs:
       - name: Execute the catalog guardrails against their fixtures
         run: python3 .github/scripts/test-catalog.py
 
+      # The other half of the catalog. Same argument as the step above: the transform a
+      # command applies at install time (`REPO` → the repo basename) was assumed.
+      - name: Install the catalog skills and check what lands
+        run: python3 .github/scripts/test-skill-install.py
+
       - name: Smoke-test the installer
         run: bash .github/scripts/test-install.sh
 
