@@ -15,7 +15,7 @@ Read `.claude/handoff/<issue-or-slug>.md` for the ticket, the analysis verdict, 
 acceptance criteria, and the implementation report.
 
 Missing file, or no recorded acceptance criteria → **stop**. Report what is missing and
-send it back to `/dev-analyze-implement`. Do not reconstruct a ticket from the diff: that
+send it back to `/dev-implement`. Do not reconstruct a ticket from the diff: that
 reviews the change against itself and approves anything self-consistent.
 
 Analysis gate is `NOT_APPROVED` but a change exists → report that as a BLOCKER and stop.
@@ -65,7 +65,7 @@ Report every finding in the reviewers' own form — `Severity · Location · Pro
 matters · Recommended correction` — ranked by impact. Merge duplicates that both reviewers
 raised into one.
 
-**Do not fix what you found.** Return the findings; the fix is a new `/dev-analyze-implement`
+**Do not fix what you found.** Return the findings; the fix is a new `/dev-implement`
 pass or a direct instruction from the user. A reviewer that patches its own findings has
 stopped being a second opinion.
 

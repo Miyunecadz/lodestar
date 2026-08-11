@@ -21,9 +21,9 @@ deliberately no dev copy of them — see CONTRIBUTING.md for why.
 ## The three-stage workflow
 
 ```
-/dev-analyze-implement   necessity analysis → gate → implement → scoped gates → report
-/dev-review              independent review vs ticket + analysis → scoped gates → verdict
-/dev-pr                  branch, fragment, commit, PR
+/dev-implement   necessity analysis → gate → implement → scoped gates → report
+/dev-review      independent review vs ticket + analysis → scoped gates → verdict
+/dev-pr          branch, fragment, commit, PR
 ```
 
 Each stage refuses to start until the previous one recorded its verdict in
