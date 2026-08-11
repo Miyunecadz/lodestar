@@ -1,6 +1,6 @@
 ---
-description: Stage 1 — decide whether an issue should be implemented, implement it only if the analysis approves, validate proportionally, and report. Never opens a PR.
-argument-hint: <issue number, URL, or a description of the work>
+description: Stage 1 — decide whether a GitHub issue should be implemented, implement it only if the analysis approves, validate proportionally, and report. Never opens a PR.
+argument-hint: <issue number or issue URL>
 ---
 
 # Stage 1 — analyse, then implement
@@ -11,33 +11,48 @@ Stage 1 of four: `/implement-ticket` → `/review-ticket` → `/create-pr` → `
 may not skip a stage. Producing a correct `BLOCKED` beats producing a change nobody asked
 for.
 
+## 0 — Input contract: a GitHub issue, nothing else
+
+This stage takes **an issue number or an issue URL**. Necessity analysis verifies the
+issue's claims against the code and the whole pipeline is keyed by issue number, so there
+is nothing for a free-form description to be analysed against or filed under.
+
+Given a description of work rather than an issue → **stop**. Say that this command needs an
+issue, and offer the two real paths: open the issue first (then re-run this), or ask for the
+change directly outside this workflow, where no handoff record and no `/create-pr` gate
+exist. Do not invent an issue number, and do not analyse a paraphrase of the request as if
+it were a ticket.
+
 ## 1 — Set up the handoff file
 
 `.claude/handoff/<issue>.md` carries state to `/review-ticket`, `/create-pr`, and
 `/pr-review`, which run in later sessions with none of this context. It is gitignored.
 
-Keep it to what the later stages cannot re-derive cheaply: the analysis verdict and its
-reasoning, the acceptance criteria, the scope, the flagged risks, the files touched, and
-the gates run. **Not** a copy of the repository or of the diff — later stages read those
-from git.
+**[`.claude/HANDOFF.md`](../HANDOFF.md) owns the schema — read it and write the literal
+field names it defines.** Later stages match those names exactly; a field written in prose
+is a field they will treat as absent. This stage writes the `Issue`, `Ticket`, `Analysis`,
+`Implementation`, and `Validation` blocks.
 
-If it already exists with a recorded verdict, this issue has been analysed — read it and
-resume from where it stopped rather than re-analysing.
+If it already exists with a recorded `Analysis.verdict`, this issue has been analysed — read
+it and resume from where it stopped rather than re-analysing.
 
 ## 2 — Analyse necessity
 
 Invoke the `github-issue-necessity-analysis` skill and follow it. Do not paraphrase it,
 re-derive it, or shortcut it because the issue looks obvious.
 
-Write its full report into the handoff file, then map its verdict to a gate:
+Write its full report into the handoff file, then map its verdict to `Analysis.verdict`:
 
-| Skill verdict | Gate | Then |
+| Skill verdict | `Analysis.verdict` | Then |
 |---|---|---|
 | IMPLEMENT | `APPROVED` | continue to step 3 |
 | PARTIALLY REQUIRED | `APPROVED` | continue, scoped to the stated remainder only |
 | ALREADY IMPLEMENTED | `NOT_APPROVED` | stop |
 | DO NOT IMPLEMENT | `NOT_APPROVED` | stop |
 | NEEDS CLARIFICATION | `NOT_APPROVED` | stop |
+
+Record the skill's own verdict verbatim as `Analysis.skill_verdict` alongside it, so a later
+stage can see which of the five produced the gate.
 
 Verify this mapping against the skill's own verdict list before relying on it — if the skill
 has gained or renamed a verdict, an unmapped verdict is `NOT_APPROVED`, not a guess.
@@ -47,7 +62,10 @@ has gained or renamed a verdict, an unmapped verdict is `NOT_APPROVED`, not a gu
 **Change no files.** No branch, no commit, no PR. A request to implement anyway is a new
 instruction from the user, not something you infer from the issue being open.
 
-1. Record the gate and the skill's verdict in the handoff file.
+1. Record it in the handoff file, explicitly and without ambiguity — `Analysis.verdict:
+   NOT_APPROVED` with its `skill_verdict`, `Implementation.status: NOT_STARTED`, and
+   `Validation.status: NOT_RUN`. A stage that stopped still writes its three status lines;
+   the next stage must be able to tell "stopped deliberately" from "never ran".
 2. Draft the issue comment: the verdict, the confidence, the two or three `path:line`
    findings it rests on, and the suggested next action. No speculation about impact.
 3. **Show the drafted comment and ask before posting.** `gh issue comment` is permitted by
@@ -86,7 +104,12 @@ What this stage adds on top, because it comes from the analysis rather than the 
 - a risk the analysis flagged is a thing to handle, not to rediscover.
 
 If implementation needs an architectural decision the analysis did not scope: stop, record
-`BLOCKED` with the specific decision needed, and report. Do not choose for the user.
+`Implementation.status: BLOCKED` with the specific decision needed in `Implementation.notes`,
+and report. Do not choose for the user. `BLOCKED` is not `COMPLETED`, and `/create-pr` reads
+that field literally.
+
+On a finished change, record `Implementation.status: COMPLETED` and list every file touched
+under `Implementation.files`.
 
 ## 4 — Validate, proportionally
 
@@ -106,17 +129,27 @@ you cannot fix is `BLOCKED`, reported with the decisive output line.
 interpreter — is `unverified`, never `passed`. Saying a check passed when it did not run is
 the one failure this stage cannot recover from, because every later stage trusts it.
 
-## 5 — Report
+`Validation.status` follows from the gate lines, with no rounding up:
 
-Append to the handoff file and return, verbatim structure:
+| Gate results | `Validation.status` |
+|---|---|
+| every derived gate ran and passed | `PASSED` |
+| any gate failed | `FAILED` |
+| all that ran passed, but one could not execute | `UNVERIFIED` |
+| no gate ran — nothing was implemented, or none was derived | `NOT_RUN` |
 
-```
-Status:      APPROVED | NOT_APPROVED | BLOCKED
-Analysis:    skill verdict + confidence, and two lines of reasoning
-Implementation: what changed, and the files touched
-Validation:  the gates that actually ran, why that set, and their results
-Handoff:     acceptance criteria · scope · flagged risks · handoff file path
-Known Issues: verified only — omit the section if there are none
-```
+An ungated change — every path is in `validation-scope`'s ungated list — is `PASSED` with
+`gates:` naming the reading you did in place of a gate, not `NOT_RUN`.
+
+## 5 — Record and report
+
+Write the `Issue`, `Ticket`, `Analysis`, `Implementation`, and `Validation` blocks to the
+handoff file in the exact form [`.claude/HANDOFF.md`](../HANDOFF.md) defines — those field
+names are the contract `/review-ticket` and `/create-pr` read.
+
+Then return, to the user, the same state in readable form: the analysis verdict with its
+confidence and two lines of reasoning, what changed and where, the gates that actually ran
+and why that set, the acceptance criteria · scope · flagged risks, the handoff file path, and
+any verified known issue. Nothing that is not also in the file — the file is what survives.
 
 **Do not commit, push, or open a PR.** `/review-ticket` runs next.

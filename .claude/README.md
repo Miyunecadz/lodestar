@@ -12,7 +12,8 @@ Dev tooling for building Lodestar. Never shipped: `install.sh` copies only from
 | `commands/` | the four-stage ticket-to-PR workflow — see below |
 | `agents/` | `gate-runner` (run a scoped or full gate set, report only failures), `kit-boundary-reviewer` (the invariants CI cannot check), `change-reviewer` (correctness against the ticket and the analysis) |
 | `skills/` | loaded on demand when a task matches |
-| `handoff/` | per-issue state passed between the three stages; gitignored, safe to delete |
+| `HANDOFF.md` | the canonical schema for `handoff/<issue>.md` — the field names the four stages write and read. The only owner of that contract |
+| `handoff/` | per-issue state passed between the four stages; gitignored, safe to delete |
 | `lodestar.manifest.json` | records which deny entries `lodestar-permissions.py` owns; **do not hand-edit** |
 
 `settings.json` runs the **shipped** hooks in place from `kit/templates/hooks/`. There is
@@ -30,15 +31,29 @@ deliberately no dev copy of them — see CONTRIBUTING.md for why.
                             description, CI status, drift since stage 2
 ```
 
-Each stage refuses to start until the previous one recorded its verdict in
-`handoff/<issue>.md`, and **only `/create-pr` may commit, push, or open a PR** — the other
-three are explicitly forbidden. The split is the point: an unnecessary issue stops at stage 1
-before any code is written, stage 2 reviews against the ticket rather than against the
-implementation's own reasoning, and stage 4 re-checks the *actual* PR, because a stage-2
-approval describes the diff that existed then.
+`handoff/<issue>.md` is the only channel between the stages, and
+[`HANDOFF.md`](HANDOFF.md) defines its field names. Each stage reads the previous stage's
+fields **literally** — a missing field is an unrun stage, never something to infer from the
+diff or from prose:
 
-Stage 2 records the SHA it reviewed. Stage 4 compares it to the PR head, so the expensive
-re-review runs only when the diff actually moved.
+- **stage 2** stops without `Analysis.criteria`;
+- **stage 3** stops unless `Analysis.verdict`, `Implementation.status`, `Validation.status`,
+  and `Review.verdict` all read `APPROVED` / `COMPLETED` / `PASSED` / `APPROVED`;
+- **stage 4** is the deliberate exception: with no handoff record it still runs, in **reduced
+  mode** — it reports what the PR does, but cannot return `APPROVED`, capping at
+  `CHANGES_REQUIRED` with the missing record as the reason. A PR that arrived by another route
+  gets reviewed rather than refused; it just cannot be blessed.
+
+**Only `/create-pr` may commit, push, or open a PR** — the other three are explicitly
+forbidden. The split is the point: an unnecessary issue stops at stage 1 before any code is
+written, stage 2 reviews against the ticket rather than against the implementation's own
+reasoning, and stage 4 re-checks the *actual* PR, because a stage-2 approval describes the
+diff that existed then.
+
+Stage 2 records `Review.reviewed_sha` **only when a commit actually contains what it
+reviewed** — a staged or dirty review records `UNAVAILABLE`. Stage 4 skips the implementation
+diff review only on a usable SHA equal to the PR head, so the expensive re-review runs
+whenever the diff moved or nothing ever pinned it.
 
 `validation-scope` maps changed paths to the gates those paths can actually break, so a
 docs edit does not pay for the whole suite of temp-workspace smoke tests. `ci.yml` stays

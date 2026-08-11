@@ -1,6 +1,6 @@
 ---
 description: Stage 3 — the only place a branch, commit, and pull request are created. Refuses to run unless the handoff file records an approved analysis, a completed implementation, an approved review, and passing gates.
-argument-hint: <issue number or slug — the handoff file to open the PR from>
+argument-hint: <issue number — the handoff file to open the PR from>
 ---
 
 # Stage 3 — open the PR
@@ -18,21 +18,27 @@ before it.
 
 ## 1 — Gate
 
-Read `.claude/handoff/<issue>.md`. All four must be recorded:
+Read `.claude/handoff/<issue>.md`, whose schema is [`.claude/HANDOFF.md`](../HANDOFF.md).
+All four fields must be present with exactly these values:
 
 ```
-Issue Analysis  = APPROVED
-Implementation  = Completed
-Review          = APPROVED
-Validation      = passed
+Analysis.verdict       == APPROVED
+Implementation.status  == COMPLETED
+Validation.status      == PASSED
+Review.verdict         == APPROVED
 ```
 
-Any one missing, absent, or contradicted → **stop** and name which. Do not infer approval
-from a clean diff, a green gate run, or the user asking for a PR. An unrecorded stage is an
-unrun stage.
+Match the literal field names and the literal values. A field that is absent, empty, spelled
+differently, or holds any other value — `BLOCKED`, `NOT_STARTED`, `UNVERIFIED`, `FAILED`,
+`NOT_RUN`, `CHANGES_REQUIRED` — is a **stop**, and say which field and what it held.
 
-`Review = CHANGES_REQUIRED` is a hard stop, not a warning to note in the PR body. Do not
-open the PR "so the findings can be discussed there".
+**Do not interpret.** Not from prose elsewhere in the file, not from a clean diff, not from a
+green gate run you do yourself, not from the user asking for a PR. If an earlier stage meant
+to record approval and did not, the fix is to re-run that stage, not to read its intent. An
+unrecorded stage is an unrun stage — that is the entire purpose of the handoff.
+
+`Review.verdict: CHANGES_REQUIRED` is a hard stop, not a warning to note in the PR body. Do
+not open the PR "so the findings can be discussed there".
 
 Confirm the working tree still matches what was reviewed: `git status --short` and
 `git diff`. Uncommitted changes beyond the reviewed diff send it back to `/review-ticket` —
@@ -62,16 +68,26 @@ Push the branch. Never force-push, never push to `main`.
 Open a **draft** PR unless the user asked otherwise, with `gh pr create`. The body:
 
 - what changed and why, in a few lines;
-- the analysis verdict and its one-line reasoning;
-- the acceptance criteria, each marked met, with its evidence;
-- the gates run and their results;
-- anything the review flagged as MEDIUM or LOW and deliberately left.
+- `Analysis.verdict` and its one-line reasoning;
+- `Analysis.criteria` with `Review.criteria_results` — each criterion, met, with its evidence;
+- `Validation.gates` and `Review.gates` — the gates run and their results;
+- anything in `Review.findings` at MEDIUM or LOW that was deliberately left.
 
 All of that is already in the handoff file. Copy it across; do not re-derive it.
+
+Reference the issue as `(#N)` in the commit subject and name it in the body, so `/pr-review`
+can resolve this PR back to `handoff/<issue>.md`.
 
 CI is the required check. Report the PR URL and the check status; **do not merge.**
 
 ## 4 — Record
 
-Append the PR number and URL to the handoff file. `/pr-review` needs the number, and it is
-the last thing this stage knows that the next one cannot cheaply find.
+Append the `PR` block — `number`, `url`, and `head_sha` (the SHA you actually pushed,
+`git rev-parse HEAD` after the last commit) — per
+[`.claude/HANDOFF.md`](../HANDOFF.md). `/pr-review` reads all three, and they are the last
+things this stage knows that the next one cannot cheaply find.
+
+If the pushed head is a **new commit** of content stage 2 reviewed as staged or dirty, that
+does not retroactively validate `Review.reviewed_sha`. Leave stage 2's block exactly as it
+is, `UNAVAILABLE` included. `/pr-review` will re-review the diff in full, which is correct:
+no one has reviewed these commits.
