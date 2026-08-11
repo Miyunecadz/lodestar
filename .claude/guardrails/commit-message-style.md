@@ -1,15 +1,17 @@
 ---
 name: commit-message-style
 enabled: true
-severity: warn
-stacks: [all]
 event: bash
 pattern: '(^|[;&|]\s*)git(\s+-\S+)*\s+commit\b'
+severity: warn
+stacks: [all]
 match: argv
 surface: agent
 ---
 
 Keep commit messages to a **single line** — a concise subject, no body — and do **not** append a `Co-Authored-By:` trailer (or other trailers). If a `-m` message spans multiple lines or adds a co-author, rewrite it as one line before committing.
+
+---
 
 This encodes an opinionated style; adjust to taste. Set `severity: block` to hard-reject instead of remind. Note a `bash` rule only sees `git commit -m "…"` — for enforcement across *all* commits (including editor/manual ones), pair it with a native `commit-msg` git hook that reads the message file.
 

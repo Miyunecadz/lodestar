@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Dev-only PostToolUse hook: shellcheck a shell file right after it is written.
 
-Gate 1 of CI is `shellcheck --severity=error` over install.sh and the test scripts. This
-runs the same check on the single file just edited, so a quoting bug is caught at the
-edit rather than in CI.
+CI runs `shellcheck --severity=error` over every `.sh` in the repo, discovered with
+`find`. This runs the same check on the single file just edited, so a quoting bug is
+caught at the edit rather than in CI.
 
 Not part of the kit — `install.sh` only copies from `kit/`. Silent on success, and
 silent when shellcheck is not installed (it is a CI tool, not a hard local dependency).
@@ -63,7 +63,7 @@ def main():
     print(json.dumps({
         "systemMessage": (
             f"shellcheck --severity=error fails on {os.path.basename(path)} "
-            f"(CI gate 1 will reject this):\n\n" + out
+            f"(the CI shellcheck gate will reject this):\n\n" + out
         )
     }))
 
