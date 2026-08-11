@@ -8,6 +8,9 @@
 .claude/*.local.md
 .claude/settings.local.json
 
+# --- Dev workflow scratch: per-issue state passed between the dev-* stages ---
+.claude/handoff/
+
 # --- Generated artifacts (Graphify, etc.) ---
 graph.html
 graph.json
