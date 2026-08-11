@@ -17,8 +17,8 @@ You add or change one Django REST Framework endpoint on **REPO**'s API surface.
 
 **Done-condition:** serializer, viewset/view, URL route, and permission all in place — and the contract doc updated to match.
 
-1. Read `docs/_shared/rest-api-contract.md` first — it is the **source of truth** for the surface. Plan the change against it.
+1. Read `docs/_shared/api-contract.md` first — it is the **source of truth** for the surface. Plan the change against it. If the section covering this surface is still a `<!-- TODO: human -->` marker, say so and plan from the code — never infer the contract — then fill that section from what you implement.
 2. Add or modify the serializer, the viewset or `APIView`, its URL route, and the corresponding DRF permission class together (an endpoint without a permission class is a gap).
-3. Update `docs/_shared/rest-api-contract.md` so the contract stays in sync with the surface.
+3. Update `docs/_shared/api-contract.md` so the contract stays in sync with the surface.
 
 Load `drf-api-contract` and `django-backend-standards`.

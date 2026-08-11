@@ -17,7 +17,7 @@ You add or change one endpoint on **REPO**'s API surface.
 
 **Done-condition:** route, controller action, validation, response shape, and authorization all in place — and the contract doc updated to match.
 
-1. Read `docs/_shared/api-contract.md` first — it is the **source of truth** for the surface. Plan the change against it.
+1. Read `docs/_shared/api-contract.md` first — it is the **source of truth** for the surface. Plan the change against it. If the section covering this surface is still a `<!-- TODO: human -->` marker, say so and plan from the code — never infer the contract — then fill that section from what you implement.
 2. Add or modify the route (`routes/api.php` or `routes/web.php`), the controller action, a **FormRequest** for validation, and an **API Resource** for the response shape, together. Validation in the controller body and array-shaped JSON responses both drift — the FormRequest and Resource are what keep the surface documented.
 3. Wire **authorization**: a Policy method (or an explicit gate check) per action. An endpoint with no authorization is a gap, the same way a DRF endpoint without a permission class is.
 4. Update `docs/_shared/api-contract.md` so the contract stays in sync.

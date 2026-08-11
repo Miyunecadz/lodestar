@@ -17,7 +17,7 @@ You add or change one resolver on **REPO**'s GraphQL surface, with its permissio
 
 **Done-condition:** resolver, its schema type, and its shield permission all in place — and the contract doc updated to match.
 
-1. Read `docs/_shared/api-contract.md` first — it is the **source of truth** for the surface. Plan the change against it.
+1. Read `docs/_shared/api-contract.md` first — it is the **source of truth** for the surface. Plan the change against it. If the section covering this surface is still a `<!-- TODO: human -->` marker, say so and plan from the code — never infer the contract — then fill that section from what you implement.
 2. Add or modify the resolver, its schema type/field, and the corresponding `graphql-shield` permission rule together (a resolver without a permission rule is a gap).
 3. Update `docs/_shared/api-contract.md` so the contract stays in sync with the surface.
 
