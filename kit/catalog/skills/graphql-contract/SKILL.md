@@ -1,6 +1,6 @@
 ---
 name: graphql-contract
-description: Use when changing anything on the shared API surface — queries, mutations, subscriptions, or permissions — that the repos depend on.
+description: Use when changing the shared GraphQL schema that other repos query — types, queries, mutations, subscriptions, or field permissions.
 stacks: [graphql-apollo-server, graphql-apollo-client]
 ---
 

@@ -243,10 +243,25 @@ Guardrail for yourself: if a new role's body starts duplicating a skill, stop �
 3. Keep the body thin; point at `docs/…`.
 4. It's picked up on the next `/lodestar-onboard` (for stack-scoped skills) or copied by `/lodestar-init` (for workspace-wide skills like planning).
 
+### Writing a trigger that fires
+
+A skill fails differently from a guardrail. A rule that stops matching eventually gets noticed; a skill that never loads is indistinguishable from a task that needed no skill — no error, no log, no output. So the properties that decide whether it fires are checked rather than left to review. `validate.py` enforces all four:
+
+- **The description starts `Use when`.** It is the whole routing decision: the model reads an index of triggers and pulls the body only when one matches the task in front of it. "Backend conventions for the API repo" is a summary — it describes the skill instead of naming the moment to load it. Name the task, and name what it excludes if that is what distinguishes it (`planning-workflow` ends "Not for implementation.").
+- **Two skills sharing a stack may not read alike.** The model chooses *between* triggers, so two that a person cannot tell apart make the choice arbitrary. The check compares pairs sharing a literal `stacks` tag, plus every pair involving a `stacks: [all]` skill — same-stack is where the model has nothing but the wording to route on. It is narrower than "could co-load": a repo matches several tags at once and §5 copies every match into one `.claude/skills/`, so two skills with different tags do end up side by side without being compared. Nothing in the catalog is near the limit today (the highest pair is 0.69), so the narrowness costs nothing yet; what it protects is the per-stack conventions family, which is *correctly* similar by design and differentiated by a short decisive token rather than by sentence shape. `graphql-contract` and `drf-api-contract` show why the reader still matters more than the check: different stacks, so they are never compared, and each names its own surface anyway ("GraphQL schema", "REST API surface").
+- **`stacks` values must be tags `/lodestar-onboard` §2 can detect.** The vocabulary is that table, read directly — not a second list kept in step by hand. A typo (`react-nativ`) yields an entry that installs cleanly and matches nothing, so add the detector *before* the tag (see [Add a stack detector](#add-a-stack-detector)).
+- **The file stays under 2000 bytes.** A skill is a router, not a knowledge base. The shipped ten run 723–1593 bytes; past the budget it has become the always-on payload the router exists to avoid. Move the content into `docs/…` and point at it.
+
+### The `REPO` substitution
+
+`REPO` in a skill body is a placeholder, on purpose — `/lodestar-onboard` §5 replaces it with the repo's basename when it installs the skill, so the body points at that repo's own `docs/<repo>/conventions.md`. Six of the shipped skills rely on it.
+
+`test-skill-install.py` asserts that installing resolves it — see [CI.md](CI.md) for what that gate does. Two consequences for you: leave the `REPO` token alone in a skill body (it is resolved at install time, not a typo), and if you point a skill at a new `docs/…` path, add the template that puts that file in a workspace, or the gate fails on a path no user has.
+
 ## Add a stack detector
 
 To support a new stack:
-1. Add a detection signal to `/lodestar-onboard` §2 (e.g. "`Cargo.toml` present → `rust`").
+1. Add a detection signal to `/lodestar-onboard` §2, as a table row — `` | `Cargo.toml` present | `rust` | ``. The row shape matters: `validate.py` parses that table to get the vocabulary every entry's `stacks` is checked against, so a signal written any other way leaves the tag unknown and fails your own new entry.
 2. Tag relevant catalog entries with the new stack.
 3. That's it — the pickers intersect detected stacks with entry `stacks` automatically.
 
