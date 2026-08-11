@@ -1,5 +1,5 @@
 {
-  "$comment": "Lodestar's own dev config. Never shipped \u2014 install.sh only copies from kit/. This repo dogfoods its own guardrail engine: rules live in .claude/guardrails/, and permissions.deny is merged by .claude/hooks/lodestar-permissions.py (do not hand-edit entries it owns).",
+  "$comment": "Lodestar's own dev config. Never shipped \u2014 install.sh only copies from kit/. This repo dogfoods its own guardrail engine by running the SHIPPED hooks in place from kit/templates/hooks/ rather than a copy: a copy drifted two releases behind before anyone noticed. Rules live in .claude/guardrails/; permissions.deny is merged by kit/templates/hooks/lodestar-permissions.py (do not hand-edit entries it owns).",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lodestar-guardrails.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/kit/templates/hooks/lodestar-guardrails.py\""
           }
         ]
       }
@@ -31,14 +31,18 @@
   "permissions": {
     "allow": [
       "Bash(python3 .github/scripts/validate.py)",
+      "Bash(python3 .github/scripts/test-hook-parity.py)",
+      "Bash(python3 .github/scripts/test-catalog.py)",
       "Bash(bash .github/scripts/test-engine.sh)",
       "Bash(bash .github/scripts/test-install.sh)",
       "Bash(bash .github/scripts/test-precommit.sh)",
       "Bash(bash .github/scripts/test-coverage.sh)",
       "Bash(bash .github/scripts/test-freshness.sh)",
+      "Bash(bash .github/scripts/test-graph-refresh.sh)",
       "Bash(bash .github/scripts/test-permissions.sh)",
+      "Bash(python3 .github/scripts/release.py:*)",
       "Bash(shellcheck:*)",
-      "Bash(python3 .claude/hooks/lodestar-permissions.py:*)",
+      "Bash(python3 kit/templates/hooks/lodestar-permissions.py:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",

@@ -95,7 +95,7 @@ def frontmatter(text):
 COPIED = [
     "event", "pattern", "severity", "stacks", "allow_if_untracked",
     "only_on_default_branch", "match", "allow_paths", "ignore_case", "surface",
-    "commit_check", "commit_severity", "requires_manifest_missing",
+    "permission_rules", "commit_check", "commit_severity", "requires_manifest_missing",
 ]
 
 

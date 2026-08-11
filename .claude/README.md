@@ -16,8 +16,7 @@ So contributors can drop `.claude/agents/`, `.claude/skills/`, `.claude/workflow
 | Path | What it does |
 |---|---|
 | `settings.json` | registers the guardrail engine (PreToolUse) and the two dev hooks (PostToolUse); holds the allow-list for the CI gates and the `permissions.deny` block |
-| `guardrails/` | four dogfooded rules — this repo runs its own product against itself |
-| `hooks/lodestar-*.py` | copies of the three shipped surface hooks, so a rule change is exercised here before it ships |
+| `guardrails/` | four dogfooded rules — this repo runs its own product against itself. Installed copies of the catalog entries of the same name, produced by the picker's transform (`id:` → `name:` + `enabled: true`); re-derive them from `kit/catalog/guardrails/` rather than hand-editing, or they drift out of the product |
 | `hooks/dev-*.py` | **dev-only**, no kit equivalent: run `validate.py` after a catalog edit and `shellcheck` after a shell edit, so a CI failure surfaces at the edit instead of at push |
 | `agents/` | `gate-runner` (run every CI gate, report only failures), `kit-boundary-reviewer` (the invariants CI cannot check) |
 | `skills/` | `catalog-entry-authoring`, `hook-engine-invariants` — loaded on demand when a task matches |
@@ -27,5 +26,11 @@ So contributors can drop `.claude/agents/`, `.claude/skills/`, `.claude/workflow
 users will get. Three surfaces are live: the PreToolUse engine, `permissions.deny`, and
 the pre-commit checker — the last one needs wiring per clone, see
 [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+
+**The surface hooks are not copied here.** `settings.json` runs
+`kit/templates/hooks/lodestar-*.py` in place, and the pre-commit hook is copied from the
+same folder. A dev copy used to live in `hooks/`; it fell two releases behind the shipped
+engine — no gate compared them — so the repo was dogfooding a version it did not ship.
+Running the real files is the fix that cannot drift.
 
 See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the full layout.

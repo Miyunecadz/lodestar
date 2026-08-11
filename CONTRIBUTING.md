@@ -33,12 +33,15 @@ To exercise them end to end, install Lodestar into a scratch workspace:
 
 The repo dogfoods its own guardrails, and two of the three surfaces work the moment you
 open the clone: the PreToolUse engine and `permissions.deny` are both wired through the
-committed `.claude/settings.json`.
+committed `.claude/settings.json`. It points at `kit/templates/hooks/` — the **shipped**
+hooks, run in place. There is deliberately no dev copy of them: one existed, and it drifted
+two releases behind the product before anyone noticed, so "we dogfood the engine" had
+quietly stopped being true.
 
-The **commit surface is not**, because `.git/hooks/` cannot be tracked. Wire it once:
+The **commit surface is not** wired, because `.git/hooks/` cannot be tracked. Do it once:
 
 ```bash
-cp .claude/hooks/lodestar-precommit-check.py .git/hooks/pre-commit
+cp kit/templates/hooks/lodestar-precommit-check.py .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
 
@@ -57,7 +60,8 @@ skill), a template, or a stack detector. Everything is plain Markdown; no code c
 
 ## Before you push
 
-CI runs ten gates (see `.github/workflows/ci.yml`); run them locally:
+`.github/workflows/ci.yml` is the authoritative gate list — run every gate it names rather
+than a remembered count, which has gone stale more than once. As of now that is:
 
 ```bash
 find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck --severity=error
