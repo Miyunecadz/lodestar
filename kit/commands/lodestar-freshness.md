@@ -64,7 +64,7 @@ So two branches that both rebuilt a graph merge cleanly:
 
 ## 7. Update the manifest & report
 - Record what was installed under a `freshness` key in `.claude/lodestar.manifest.json`, e.g.:
-  ```json
+  ```json manifest
   "freshness": {
     "hookManager": "lefthook",
     "graphifyLockstep": ["api"],

@@ -9,8 +9,14 @@ the manifest still has no schema and nothing yet verifies a command spec end to 
 
 ### Added
 - `validate.py`: `check_manifest_flags()` requires a rule's `requires_manifest_missing` value
-  to exist as a *path* among the things that write the manifest — the same nesting, in a
-  fenced JSON block of some `kit/commands/lodestar-*.md`, or in a `kit/templates/hooks/*.py`
-  assignment into the manifest dict. Both sides are read structurally, so two unrelated
-  sibling keys never satisfy a two-segment flag, and prose *about* a rule never stands in for
-  the JSON block that writes it. A flag naming no key at all is rejected.
+  to be a path the engine could actually walk to in the manifest — one written by a
+  `kit/commands/lodestar-*.md` manifest fence, or by a `kit/templates/hooks/*.py` assignment
+  into the manifest dict. Both sides are read structurally, so a key under an array and two
+  unrelated sibling keys are both rejected, and prose *about* a rule never stands in for the
+  JSON that writes it. A flag naming no key at all is rejected.
+
+### Changed
+- Command specs mark the JSON blocks that write `.claude/lodestar.manifest.json` by opening
+  the fence ` ```json manifest `. Their other blocks describe `settings.json`, `source.json`,
+  or a repo entry inside `repos[]` — real keys, but not manifest paths, and a rule keyed on
+  one would nag forever. Nothing in the JSON itself distinguishes them.

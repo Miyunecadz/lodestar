@@ -398,7 +398,7 @@ def check_copied_fields():
 COMMAND_SPECS = "kit/commands/lodestar-*.md"
 WRITER_HOOKS = "kit/templates/hooks/*.py"
 MANIFEST_VAR = "manifest"
-JSON_BLOCK = re.compile(r"```json(.*?)```", re.S)
+MANIFEST_BLOCK = re.compile(r"```json[ \t]+manifest\b(.*?)```", re.S)
 
 
 def json_key_paths(fragment):
@@ -406,9 +406,12 @@ def json_key_paths(fragment):
 
     `"k":` names a key; braces and brackets give the nesting. The blocks in a command spec
     are fragments with placeholders (`<ISO-8601 UTC>`, `[ ... ]`), so `json.loads` is not an
-    option — but the nesting is what matters here, and that survives a scan. A path is only
-    recorded where the key really sits: `{"repos": [], "skills": []}` yields `repos` and
-    `skills`, never `repos.skills`.
+    option — but the nesting is what matters here, and that survives a scan.
+
+    A path is only recorded where the key really sits, and only where the engine could walk
+    to it. `{"repos": [], "skills": []}` yields `repos` and `skills`, never `repos.skills`;
+    `{"repos": [{"name": "x"}]}` yields `repos` alone, because `manifest_missing()` walks
+    node by node and gives up at the list — a rule keyed on `repos.name` would nag forever.
     """
     paths, stack, pending = set(), [], None
     i, n = 0, len(fragment)
@@ -423,11 +426,12 @@ def json_key_paths(fragment):
             while rest < n and fragment[rest].isspace():
                 rest += 1
             if rest < n and fragment[rest] == ":":
-                paths.add(".".join([s for s in stack if s] + [token]))
+                if not any(kind == "[" for kind, _ in stack):
+                    paths.add(".".join([key for _, key in stack if key] + [token]))
                 pending, i = token, rest + 1
             continue
         if char in "{[":
-            stack.append(pending)
+            stack.append((char, pending))
             pending = None
         elif char in "}]":
             if stack:
@@ -470,18 +474,46 @@ def dict_literal_paths(node, prefix):
     return paths
 
 
+def manifest_roots(tree):
+    """Variable names that hold the manifest dict.
+
+    A hook is recognised by what it loads — `x = load_json(manifest_path, {})` makes `x` a
+    root — with the name `manifest` accepted outright, since that is what every shipped hook
+    calls it. The assumption is deliberate and it *underreaches*: a hook that loads the
+    manifest some other way contributes no paths, so a rule keyed on what it writes fails
+    this gate loudly rather than passing on a guess. Widen this if that day comes.
+    """
+    roots = {MANIFEST_VAR}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+            continue
+        args = [a.id for a in node.value.args if isinstance(a, ast.Name)]
+        if not any(a.endswith("manifest_path") for a in args):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                roots.add(target.id)
+    return roots
+
+
 def hook_manifest_paths(source):
-    """Dotted manifest paths a hook writes, from assignments rooted at a `manifest` dict.
+    """Dotted manifest paths a hook writes, from assignments rooted at the manifest dict.
 
     Only literal subscripts and dict literals count, so this reports what the source actually
     stores rather than what it mentions. One indirection is resolved — `surfaces["x"] = {...}`
     followed by `manifest["y"] = surfaces` — because that is how the permission surface
     records itself.
+
+    `var_paths` is module-wide rather than per function: a hook is one self-contained file
+    whose names are not reused across scopes, and keeping it flat is what lets the alias above
+    resolve at all. It can only over-collect for a *non-root* variable, which reaches the
+    result solely through an assignment into the manifest.
     """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return set()
+    roots = manifest_roots(tree)
     var_paths, rooted, aliased = {}, set(), []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
@@ -499,7 +531,7 @@ def hook_manifest_paths(source):
             found = {tuple(parts)} if parts else set()
             found |= dict_literal_paths(node.value, list(parts))
             var_paths.setdefault(var, set()).update(found)
-            if var == MANIFEST_VAR:
+            if var in roots:
                 rooted |= found
                 if isinstance(node.value, ast.Name):
                     aliased.append((tuple(parts), node.value.id))
@@ -522,12 +554,20 @@ def check_manifest_flags():
     top-level keys, and at runtime `manifest_missing()` walks node by node and returns True the
     moment an intermediate is not a dict — so a rule keyed on it would nag forever. Prose about
     a rule is not scanned at all; prose is not what writes the manifest.
+
+    Only fences opened as ```` ```json manifest ```` count, and only those rooted at the
+    manifest itself. A spec's other blocks describe `.claude/settings.json`, `source.json`, or
+    a *repo entry* inside `repos[]` — keys that are real, but not manifest paths, and a rule
+    keyed on one of them would nag forever exactly like a misspelt key. The marker is what
+    tells the two apart; nothing in the JSON itself does.
     """
     writers = {}
+    marked = 0
     for path in sorted(glob.glob(os.path.join(ROOT, COMMAND_SPECS))):
         rel = os.path.relpath(path, ROOT)
         with open(path) as f:
-            for block in JSON_BLOCK.findall(f.read()):
+            for block in MANIFEST_BLOCK.findall(f.read()):
+                marked += 1
                 for key_path in json_key_paths(block):
                     writers.setdefault(key_path, rel)
     for path in sorted(glob.glob(os.path.join(ROOT, WRITER_HOOKS))):
@@ -535,10 +575,15 @@ def check_manifest_flags():
         with open(path) as f:
             for key_path in hook_manifest_paths(f.read()):
                 writers.setdefault(key_path, rel)
+    if not marked:
+        errors.append(f"{COMMAND_SPECS}: no ```json manifest fence found in any command spec "
+                      "— either the marker was dropped or the manifest is now written "
+                      "somewhere this check cannot see, and it is what keeps a self-silencing "
+                      "rule's manifest key writable")
+        return
     if not writers:
-        errors.append(f"{COMMAND_SPECS}: no JSON key paths found in any command spec or "
-                      f"{WRITER_HOOKS} — this check cannot run, and it is what keeps a "
-                      "self-silencing rule's manifest key writable")
+        errors.append(f"{COMMAND_SPECS}: the ```json manifest fences define no key paths, and "
+                      f"no {WRITER_HOOKS} writes one either — this check cannot run")
         return
 
     for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
@@ -555,9 +600,9 @@ def check_manifest_flags():
             hint = f" — the closest paths written are {', '.join(near)}" if near else ""
             errors.append(
                 f"{rel}: requires_manifest_missing names `{flag}`, which no {COMMAND_SPECS} "
-                f"JSON block and no {WRITER_HOOKS} writes as a manifest path{hint}. A key "
-                "nothing writes can never go absent-to-present, so the rule can never silence "
-                "itself")
+                f"```json manifest fence and no {WRITER_HOOKS} writes as a manifest path"
+                f"{hint}. A key nothing writes can never go absent-to-present, so the rule can "
+                "never silence itself")
 
 
 def check_catalog_totals():
