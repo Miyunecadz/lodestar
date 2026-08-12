@@ -8,9 +8,9 @@ had to fix by hand once, one level down — a partial step on #27 and #25, and n
 the manifest still has no schema and nothing yet verifies a command spec end to end.
 
 ### Added
-- `validate.py`: `check_manifest_flags()` requires every segment of a
-  `requires_manifest_missing` dotted path to appear as a quoted JSON key in some
-  `kit/commands/lodestar-*.md`, and rejects a flag that names no key at all. Segments are
-  matched as JSON keys rather than as the dotted string on purpose — the dotted form also
-  appears in prose *about* the rule, and prose is not what writes the manifest, so matching it
-  would let a renamed JSON block pass.
+- `validate.py`: `check_manifest_flags()` requires a rule's `requires_manifest_missing` value
+  to exist as a *path* among the things that write the manifest — the same nesting, in a
+  fenced JSON block of some `kit/commands/lodestar-*.md`, or in a `kit/templates/hooks/*.py`
+  assignment into the manifest dict. Both sides are read structurally, so two unrelated
+  sibling keys never satisfy a two-segment flag, and prose *about* a rule never stands in for
+  the JSON block that writes it. A flag naming no key at all is rejected.

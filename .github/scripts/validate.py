@@ -7,7 +7,7 @@ Checks, with stdlib only:
   - every skill's description is a load trigger, and its body fits the size budget;
   - no two skills that can load together share an indistinguishable trigger;
   - every entry's `stacks` values are tags `/lodestar-onboard` §2 can detect;
-  - every self-silencing rule's manifest key is one a command spec actually writes;
+  - every self-silencing rule's manifest key is a path a spec or hook actually writes;
   - every guardrail has positive and negative behaviour fixtures;
   - every guardrail's block-time message fits the redirect budget;
   - changelog.d/ fragments are well-formed;
@@ -17,6 +17,7 @@ Exits non-zero (listing every problem) if anything is off.
 """
 import os
 import re
+import ast
 import sys
 import glob
 import difflib
@@ -395,28 +396,149 @@ def check_copied_fields():
 
 
 COMMAND_SPECS = "kit/commands/lodestar-*.md"
+WRITER_HOOKS = "kit/templates/hooks/*.py"
+MANIFEST_VAR = "manifest"
+JSON_BLOCK = re.compile(r"```json(.*?)```", re.S)
+
+
+def json_key_paths(fragment):
+    """Dotted key paths written by a JSON fragment.
+
+    `"k":` names a key; braces and brackets give the nesting. The blocks in a command spec
+    are fragments with placeholders (`<ISO-8601 UTC>`, `[ ... ]`), so `json.loads` is not an
+    option — but the nesting is what matters here, and that survives a scan. A path is only
+    recorded where the key really sits: `{"repos": [], "skills": []}` yields `repos` and
+    `skills`, never `repos.skills`.
+    """
+    paths, stack, pending = set(), [], None
+    i, n = 0, len(fragment)
+    while i < n:
+        char = fragment[i]
+        if char == '"':
+            j = i + 1
+            while j < n and fragment[j] != '"':
+                j += 2 if fragment[j] == "\\" else 1
+            token, i = fragment[i + 1:j], j + 1
+            rest = i
+            while rest < n and fragment[rest].isspace():
+                rest += 1
+            if rest < n and fragment[rest] == ":":
+                paths.add(".".join([s for s in stack if s] + [token]))
+                pending, i = token, rest + 1
+            continue
+        if char in "{[":
+            stack.append(pending)
+            pending = None
+        elif char in "}]":
+            if stack:
+                stack.pop()
+            pending = None
+        elif char == ",":
+            pending = None
+        i += 1
+    return paths
+
+
+def subscript_path(node):
+    """`manifest["a"]["b"]` → `("manifest", ["a", "b"])`; None if a subscript is not a literal."""
+    parts = []
+    while isinstance(node, ast.Subscript):
+        key = node.slice
+        if key.__class__.__name__ == "Index":  # pre-3.9 ast wraps the subscript
+            key = key.value
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+            return None
+        parts.append(key.value)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    parts.reverse()
+    return node.id, parts
+
+
+def dict_literal_paths(node, prefix):
+    """Every dotted path a `{...}` literal defines below `prefix`."""
+    paths = set()
+    if not isinstance(node, ast.Dict):
+        return paths
+    for key, value in zip(node.keys, node.values):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+            continue
+        path = prefix + [key.value]
+        paths.add(tuple(path))
+        paths |= dict_literal_paths(value, path)
+    return paths
+
+
+def hook_manifest_paths(source):
+    """Dotted manifest paths a hook writes, from assignments rooted at a `manifest` dict.
+
+    Only literal subscripts and dict literals count, so this reports what the source actually
+    stores rather than what it mentions. One indirection is resolved — `surfaces["x"] = {...}`
+    followed by `manifest["y"] = surfaces` — because that is how the permission surface
+    records itself.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
+    var_paths, rooted, aliased = {}, set(), []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                var, parts = target.id, []
+            elif isinstance(target, ast.Subscript):
+                resolved = subscript_path(target)
+                if resolved is None:
+                    continue
+                var, parts = resolved
+            else:
+                continue
+            found = {tuple(parts)} if parts else set()
+            found |= dict_literal_paths(node.value, list(parts))
+            var_paths.setdefault(var, set()).update(found)
+            if var == MANIFEST_VAR:
+                rooted |= found
+                if isinstance(node.value, ast.Name):
+                    aliased.append((tuple(parts), node.value.id))
+    for prefix, name in aliased:
+        rooted |= {prefix + path for path in var_paths.get(name, set())}
+    return {".".join(path) for path in rooted}
 
 
 def check_manifest_flags():
-    """A self-silencing rule's `requires_manifest_missing` key must be one a command writes.
+    """A self-silencing rule's `requires_manifest_missing` key must be one something writes.
 
     The key is the whole mechanism: the rule fires while the dotted path is absent, false, or
     empty, and goes quiet once the manifest records it. But the *reader* is a catalog entry and
-    the *writer* is a command spec, in another directory, and nothing tied the two. Rename
-    either side and the rule silently changes character — it nags forever, or it goes quiet
-    about a gap that is still open. Neither shows up as an error anywhere, which is why this is
-    a gate and not a convention.
+    the *writer* is a command spec or a shipped hook, in another directory, and nothing tied
+    the two. Rename either side and the rule silently changes character — it nags forever, or
+    it goes quiet about a gap that is still open. Neither shows up as an error anywhere, which
+    is why this is a gate and not a convention.
 
-    Segments are checked as quoted JSON keys, not as the dotted string: the dotted form also
-    appears in prose *about* the rule, and prose is not what writes the manifest.
+    The flag is matched as a *path*, not as a bag of names: `repos.skills` names two unrelated
+    top-level keys, and at runtime `manifest_missing()` walks node by node and returns True the
+    moment an intermediate is not a dict — so a rule keyed on it would nag forever. Prose about
+    a rule is not scanned at all; prose is not what writes the manifest.
     """
-    specs = {}
+    writers = {}
     for path in sorted(glob.glob(os.path.join(ROOT, COMMAND_SPECS))):
+        rel = os.path.relpath(path, ROOT)
         with open(path) as f:
-            specs[os.path.relpath(path, ROOT)] = f.read()
-    if not specs:
-        errors.append(f"{COMMAND_SPECS}: no command specs found — this check cannot run, and "
-                      "it is what keeps a self-silencing rule's manifest key writable")
+            for block in JSON_BLOCK.findall(f.read()):
+                for key_path in json_key_paths(block):
+                    writers.setdefault(key_path, rel)
+    for path in sorted(glob.glob(os.path.join(ROOT, WRITER_HOOKS))):
+        rel = os.path.relpath(path, ROOT)
+        with open(path) as f:
+            for key_path in hook_manifest_paths(f.read()):
+                writers.setdefault(key_path, rel)
+    if not writers:
+        errors.append(f"{COMMAND_SPECS}: no JSON key paths found in any command spec or "
+                      f"{WRITER_HOOKS} — this check cannot run, and it is what keeps a "
+                      "self-silencing rule's manifest key writable")
         return
 
     for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
@@ -424,17 +546,18 @@ def check_manifest_flags():
         flag = frontmatter(path).get("requires_manifest_missing", "").strip()
         if not flag:
             continue
-        segments = [s for s in flag.split(".") if s]
-        if not segments:
+        if not [s for s in flag.split(".") if s]:
             errors.append(f"{rel}: requires_manifest_missing is {flag!r}, which names no "
                           "manifest key — the rule would fire forever")
             continue
-        if not any(all('"%s"' % s in text for s in segments) for text in specs.values()):
+        if flag not in writers:
+            near = sorted(p for p in writers if p.split(".")[0] == flag.split(".")[0])
+            hint = f" — the closest paths written are {', '.join(near)}" if near else ""
             errors.append(
-                f"{rel}: requires_manifest_missing names `{flag}`, and no {COMMAND_SPECS} "
-                f"writes every part of it as a manifest key ({', '.join(repr(s) for s in segments)}) "
-                "— a key nothing writes can never go absent-to-present, so the rule can never "
-                "silence itself")
+                f"{rel}: requires_manifest_missing names `{flag}`, which no {COMMAND_SPECS} "
+                f"JSON block and no {WRITER_HOOKS} writes as a manifest path{hint}. A key "
+                "nothing writes can never go absent-to-present, so the rule can never silence "
+                "itself")
 
 
 def check_catalog_totals():
