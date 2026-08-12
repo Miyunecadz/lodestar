@@ -239,6 +239,8 @@ The two degradations are reported differently on purpose. Having no scanner is a
 
 A rule that reminds rather than forbids should silence itself. Without `requires_manifest_missing` you get one of two bad outcomes: a permanent nag (which trains people to ignore every warn the engine emits) or a one-time message (which is indistinguishable from no rule at all). `design-guidance-on-ui-edits` is the reference: it fires on UI edits while `designGuidance.installed` is false, and never again once it is true.
 
+The key names something in another directory: the rule *reads* it, a `kit/commands/lodestar-*.md` spec *writes* it. Rename either side alone and the rule silently changes character — a nag with no off switch, or silence about a gap that is still open — so `validate.py` requires every segment of the dotted path to appear as a quoted JSON key in some command spec. A new self-silencing rule is therefore not finished until the command that closes its gap records it.
+
 **Choosing a surface is a judgement about false positives, not about how much you care.** Three rules that look like obvious commit-surface candidates are deliberately `agent`-only:
 
 - **`protect-generated-files`** matches `graph.json`, which the freshness hook *intentionally* rebuilds and stages into the same commit. Enforcing at commit time would break the lockstep map.

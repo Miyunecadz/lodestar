@@ -7,6 +7,7 @@ Checks, with stdlib only:
   - every skill's description is a load trigger, and its body fits the size budget;
   - no two skills that can load together share an indistinguishable trigger;
   - every entry's `stacks` values are tags `/lodestar-onboard` §2 can detect;
+  - every self-silencing rule's manifest key is one a command spec actually writes;
   - every guardrail has positive and negative behaviour fixtures;
   - every guardrail's block-time message fits the redirect budget;
   - changelog.d/ fragments are well-formed;
@@ -393,6 +394,49 @@ def check_copied_fields():
                 "that behaviour with no error anywhere")
 
 
+COMMAND_SPECS = "kit/commands/lodestar-*.md"
+
+
+def check_manifest_flags():
+    """A self-silencing rule's `requires_manifest_missing` key must be one a command writes.
+
+    The key is the whole mechanism: the rule fires while the dotted path is absent, false, or
+    empty, and goes quiet once the manifest records it. But the *reader* is a catalog entry and
+    the *writer* is a command spec, in another directory, and nothing tied the two. Rename
+    either side and the rule silently changes character — it nags forever, or it goes quiet
+    about a gap that is still open. Neither shows up as an error anywhere, which is why this is
+    a gate and not a convention.
+
+    Segments are checked as quoted JSON keys, not as the dotted string: the dotted form also
+    appears in prose *about* the rule, and prose is not what writes the manifest.
+    """
+    specs = {}
+    for path in sorted(glob.glob(os.path.join(ROOT, COMMAND_SPECS))):
+        with open(path) as f:
+            specs[os.path.relpath(path, ROOT)] = f.read()
+    if not specs:
+        errors.append(f"{COMMAND_SPECS}: no command specs found — this check cannot run, and "
+                      "it is what keeps a self-silencing rule's manifest key writable")
+        return
+
+    for path in sorted(glob.glob(os.path.join(ROOT, "kit/catalog/guardrails/*.md"))):
+        rel = os.path.relpath(path, ROOT)
+        flag = frontmatter(path).get("requires_manifest_missing", "").strip()
+        if not flag:
+            continue
+        segments = [s for s in flag.split(".") if s]
+        if not segments:
+            errors.append(f"{rel}: requires_manifest_missing is {flag!r}, which names no "
+                          "manifest key — the rule would fire forever")
+            continue
+        if not any(all('"%s"' % s in text for s in segments) for text in specs.values()):
+            errors.append(
+                f"{rel}: requires_manifest_missing names `{flag}`, and no {COMMAND_SPECS} "
+                f"writes every part of it as a manifest key ({', '.join(repr(s) for s in segments)}) "
+                "— a key nothing writes can never go absent-to-present, so the rule can never "
+                "silence itself")
+
+
 def check_catalog_totals():
     """The CATALOG.md totals line is documentation that silently goes stale — count the
     files and make CI notice when it disagrees."""
@@ -630,6 +674,7 @@ def main():
     check_skill_triggers()
     check_stack_vocabulary()
     check_copied_fields()
+    check_manifest_flags()
     check_catalog_totals()
     check_catalog_listed()
     check_fixture_coverage()
