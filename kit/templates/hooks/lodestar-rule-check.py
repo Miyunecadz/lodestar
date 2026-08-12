@@ -30,7 +30,7 @@ catalog version is `/lodestar-guardrails`, re-ticking the rule.
 What is compared is exactly what the picker copies — see COMPARED. Catalog-only keys
 (`id`, `title`, `category`, `recommended`, `emits`) are picker inputs that never reach an
 installed rule, and `name` / `enabled` are written fresh rather than copied, so none of them
-is a difference. `.github/scripts/validate.py` gates COMPARED against the fields the hooks
+is a difference. A CI gate in the Lodestar repository holds COMPARED equal to the fields the hooks
 actually read, so this list cannot quietly fall behind the engine.
 
 **Finding the catalog source is itself a failure mode**, and the states below are separated
@@ -57,7 +57,7 @@ They are **named as not compared** rather than left out, because a report that s
 skipped them read as a clean bill of health for rules it had never looked at.
 
 Requires Python 3.8+ (see MIN_PYTHON), stdlib only, and stays a single self-contained file
-like the other hooks — see `.claude/skills/hook-engine-invariants`.
+like the other hooks.
 """
 
 import json
@@ -90,8 +90,8 @@ UNORDERED = {"stacks", "allow_paths", "permission_rules"}
 
 # ---------------------------------------------------------------- frontmatter
 # Duplicated from the other hooks on purpose: each script has to stay a single
-# self-contained file a user can copy into `.claude/hooks/` on its own.
-# `.github/scripts/test-hook-parity.py` is what keeps the copies in agreement.
+# self-contained file a user can copy into `.claude/hooks/` on its own. A CI gate in the
+# Lodestar repository feeds one corpus through every copy and keeps them in agreement.
 
 
 def coerce(val):

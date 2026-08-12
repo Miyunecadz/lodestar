@@ -46,3 +46,8 @@ the `requires_manifest_missing` failure (PR #64) arriving through a second door.
 - `hook-engine-invariants` states the naming requirement the copied-field gate rests on: the
   frontmatter dict is `rule` or `fm`, because a read through any other name is invisible to
   the scan and re-opens the same hole.
+- The shipped checker no longer names `.github/` scripts or this repo's dev-only
+  `.claude/skills/` in its own comments. `install.sh` copies the file verbatim into every
+  workspace, so those read as paths the user should have and does not — the only shipped hook
+  with any such reference. The mechanisms are still described; only the unresolvable paths are
+  gone. Raised in review of #71 and not fixed there.
