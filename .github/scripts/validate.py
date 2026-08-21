@@ -307,13 +307,22 @@ def hook_read_fields():
     the only authority on which fields matter; a hand-kept list here would be a fourth
     rival copy of the thing this check exists to keep in step.
 
+    Both access forms are scanned. `.get(` alone was the original pattern, and subscript is
+    live local style (`lodestar-guardrails.py` reads `rule["pattern"]`), so a new flag read
+    that way was invisible here — the same failure as `requires_manifest_missing` (PR #64)
+    arriving through a second door. What the scan still cannot see is a read through any
+    other variable name; `hook-engine-invariants` states that requirement where a hook
+    author reads it.
+
     Returns None when the scan looks broken, so a stale pattern reports itself instead of
     validating every site against an empty set and passing.
     """
     found = set()
     for path in sorted(glob.glob(os.path.join(ROOT, HOOKS_GLOB))):
         text = open(path).read()
-        found |= set(re.findall(r"(?:rule|fm)\.get\(\s*[\"']([a-z_][a-z0-9_]*)[\"']", text))
+        for form in (r"\.get\(\s*", r"\[\s*"):
+            found |= set(re.findall(
+                r"(?:rule|fm)%s[\"']([a-z_][a-z0-9_]*)[\"']" % form, text))
     found = {f for f in found if not f.startswith("_")}
     if len(found) < 10:
         return None
@@ -358,8 +367,9 @@ def check_copied_fields():
     expected = hook_read_fields()
     if expected is None:
         errors.append(
-            f"{HOOKS_GLOB}: the `rule.get(...)` / `fm.get(...)` scan found too few "
-            "frontmatter fields to be believable — the hooks changed shape and this check "
+            f"{HOOKS_GLOB}: the scan for `rule`/`fm` reads (`.get(\"x\")` and `[\"x\"]`) "
+            "found too few frontmatter fields to be believable — the hooks changed shape "
+            "and this check "
             "cannot run until the pattern is fixed. It is what keeps the picker's copy "
             "list in step with what the engine reads")
         return

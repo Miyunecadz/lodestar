@@ -81,7 +81,7 @@ The harness builds a workspace whose manifest declares **one repo per stack the 
 Two things worth knowing when adding cases:
 
 - **A negative case must fail for the reason you think.** Every file path is committed unless the row says `untracked=1`, because an untracked file is skipped by `allow_if_untracked` rules for a reason unrelated to the pattern or the stack. Mutation-testing this harness caught exactly that: widening a migration rule to `stacks: [all]` failed nothing, because its wrong-stack negative was passing on untracked-ness.
-- **`emits: settings-hook` entries never reach the engine.** The picker writes a `settings.json` PostToolUse hook whose matcher uses the pattern, so those rows assert the pattern directly. Asserting an engine verdict would test a path that does not exist in production.
+- **`emits: settings-hook` entries never reach the engine.** The picker writes a `settings.json` PostToolUse hook, and a hook `matcher` selects on *tool name*, not on a path — so the pattern lands inside the shell logic the hook runs, where nothing pins its shape. Those rows therefore assert the pattern directly; asserting an engine verdict would test a path that does not exist in production. The same absence of a pinned shape is why `lodestar-rule-check.py` reports an adopted settings-hook entry as *not compared* rather than comparing it.
 
 Prefer cases that pin a claim the rule body already makes — the negative lookahead, the stack scope, the quoted-argument exemption. A case that merely re-states "this regex matches this string" adds a line and no confidence.
 
