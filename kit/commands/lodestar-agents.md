@@ -50,7 +50,7 @@ An agent's `loads` names skills it depends on. Before finishing, make sure each 
   2. **Proceed without it** — still generate the agent; its body degrades gracefully (sound defaults, and it flags the missing guidance *every* time, not once).
 
   Then **record the outcome in the manifest**, because a decision nobody remembers is a decision that silently becomes permanent:
-  ```json
+  ```json manifest
   "designGuidance": {
     "skill": "frontend-design",
     "installed": true,

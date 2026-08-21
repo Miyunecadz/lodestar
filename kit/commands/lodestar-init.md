@@ -40,7 +40,7 @@ whatever release the spec was last edited in, which is the one thing `version` e
 tell you. If the file is missing, write `"unknown"` and say so.
 
 Create `./.claude/lodestar.manifest.json`:
-```json
+```json manifest
 {
   "version": "<contents of .lodestar/VERSION>",
   "placement": "<personal|git-workspace>",
