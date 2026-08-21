@@ -19,9 +19,10 @@ Two kinds of entry, routed by `emits`:
 
   emits: rule           installed and run through the engine, verdict asserted
   emits: settings-hook  never reaches the engine — the picker writes a settings.json
-                        PostToolUse hook whose matcher uses this pattern. Asserting an
-                        engine verdict would test a path that does not exist in
-                        production, so the pattern is matched directly instead.
+                        PostToolUse hook, whose matcher selects on tool name, so this
+                        pattern lands inside that hook's shell logic. Asserting an engine
+                        verdict would test a path that does not exist in production, so
+                        the pattern is matched directly instead.
 
 Fixture format — `.github/fixtures/guardrails.tsv`, tab-separated:
 
@@ -217,8 +218,8 @@ def main():
             fm = install_rule(entries[rule_id], rules_dir)
 
             if fm.get("emits") == "settings-hook":
-                # Never installed as an engine rule — assert the pattern itself, which
-                # is what the generated PostToolUse matcher uses.
+                # Never installed as an engine rule — assert the pattern itself, which is
+                # what the generated PostToolUse hook's own shell logic tests.
                 hit = re.search(fm["pattern"].strip("'\""), value) is not None
                 got = "WARN" if hit else "ALLOW"
             else:

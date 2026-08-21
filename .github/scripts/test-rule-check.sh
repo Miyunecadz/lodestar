@@ -207,6 +207,106 @@ check "unreadable rule fails --check" 1 "${RUN[@]}" --check
 says  "unreadable rule is named"      "UNREADABLE broken.md" "${RUN[@]}"
 rm "$WS/.claude/guardrails/broken.md" "$WS/.claude/guardrails/team-local.md"
 
+# --- 8b. the states where finding the catalog source is what fails --------------------
+# Each of these used to report the workspace clean while a stale rule kept enforcing. The
+# manifest is what separates "never adopted" from "adopted, and the entry is gone".
+MANIFEST="$WS/.claude/lodestar.manifest.json"
+cat > "$MANIFEST" <<'EOF'
+{"guardrails": ["block-env-files", "block-secret-files", "block-destructive-commands",
+                "design-guidance-on-ui-edits", "block-commit-to-default-branch",
+                "python-autolint-on-edit"]}
+EOF
+
+# An adopted `emits: settings-hook` entry installs into settings.json as shell logic, so it
+# has no rule file to walk. It must be named as uncompared, not silently omitted — but it is
+# not evidence of drift, so it must not fail --check.
+says  "settings-hook entry is named"  "NOT COMPARED python-autolint-on-edit" "${RUN[@]}"
+says  "and counted apart from rules"  "plus 1 adopted settings-hook entry" "${RUN[@]}"
+check "and does not fail --check"   0 "${RUN[@]}" --check
+says  "--rule reaches it too"         "NOT COMPARED python-autolint-on-edit" \
+  "${RUN[@]}" --rule python-autolint-on-edit
+
+# `name:` edited away from the filename. The engine enforces under `name:`, so the lookup
+# misses — and the rule used to land in the uncompared `local` bucket with its stale pattern.
+"$PY" - "$WS/.claude/guardrails/block-env-files.md" <<'PYEOF'
+import re, sys
+path = sys.argv[1]
+text = re.sub(r"(?m)^pattern:.*$", "pattern: 'STALE'", open(path).read(), count=1)
+open(path, "w").write(re.sub(r"(?m)^name:.*$", "name: renamed-by-hand", text, count=1))
+PYEOF
+check "a renamed rule fails --check" 1 "${RUN[@]}" --check
+says  "and is called RENAMED"        "RENAMED   renamed-by-hand" "${RUN[@]}"
+says  "naming the entry it used"     "compared against block-env-files" "${RUN[@]}"
+says  "and still shows the drift"    "installed  STALE" "${RUN[@]}"
+says_not "not filed as local"        "local     renamed-by-hand" "${RUN[@]}" --verbose
+
+"$PY" - "$WS/.claude/guardrails/block-env-files.md" "$ROOT/kit/catalog/guardrails/block-env-files.md" <<'PYEOF'
+import re, sys
+installed, catalog = sys.argv[1], sys.argv[2]
+want = re.search(r"(?m)^pattern:.*$", open(catalog).read()).group(0)
+text = re.sub(r"(?m)^name:.*$", "name: block-env-files", open(installed).read(), count=1)
+open(installed, "w").write(re.sub(r"(?m)^pattern:.*$", want.replace("\\", "\\\\"), text, count=1))
+PYEOF
+check "restored rule is in sync"   0 "${RUN[@]}" --check
+
+# The catalog entry withdrawn while the copy keeps enforcing. Reported only because the
+# manifest records the id as adopted — that is the whole difference from a local rule.
+mv "$WS/.lodestar/catalog/guardrails/block-env-files.md" "$WORK/withdrawn.md"
+check "a retired entry fails --check" 1 "${RUN[@]}" --check
+says  "and is called RETIRED"         "RETIRED   block-env-files" "${RUN[@]}"
+
+# Same state, no manifest: nothing can tell it from a rule the team wrote, so the benign
+# reading is taken. This is the false-positive guard on everything above.
+mv "$MANIFEST" "$WORK/manifest-away.json"
+check "unadopted, it is local again" 0 "${RUN[@]}" --check
+says  "and reported as local"        "local     block-env-files" "${RUN[@]}" --verbose
+mv "$WORK/manifest-away.json" "$MANIFEST"
+mv "$WORK/withdrawn.md" "$WS/.lodestar/catalog/guardrails/block-env-files.md"
+check "restored catalog is in sync"  0 "${RUN[@]}" --check
+
+# A catalog source this parser cannot read is not "no catalog entry" — there is nothing to
+# compare against, which is a stale copy's best hiding place.
+cp "$WS/.lodestar/catalog/guardrails/block-env-files.md" "$WORK/keep.md"
+printf 'no frontmatter in the catalog entry\n' > "$WS/.lodestar/catalog/guardrails/block-env-files.md"
+check "unreadable source fails --check" 1 "${RUN[@]}" --check
+says  "and says which file"              "CATALOG   block-env-files" "${RUN[@]}"
+says  "--json calls it out"              '"catalogUnreadable": 1' "${RUN[@]}" --json
+cp "$WORK/keep.md" "$WS/.lodestar/catalog/guardrails/block-env-files.md"
+check "workspace clean again"          0 "${RUN[@]}" --check
+
+# Nothing on any of those paths may rewrite a rule. The checker reports; it never repairs.
+says "the rule file was never touched" "name: block-env-files" \
+  cat "$WS/.claude/guardrails/block-env-files.md"
+rm "$MANIFEST"
+
+# --- 8c. the copied-field gate sees subscript reads too -------------------------------
+# `validate.py` derives the copied-field list by scanning hook source. It matched `.get(`
+# only, so a flag read as `rule["new_flag"]` was invisible and every site that has to name
+# it could stay silent — the `requires_manifest_missing` failure (PR #64) through a second
+# door. Mutating a copy of the tree, never this one.
+MUT="$WORK/mutant"
+mkdir -p "$MUT"
+(cd "$ROOT" && git ls-files -z | xargs -0 tar cf -) | (cd "$MUT" && tar xf -)
+for form in 'rule.get("brand_new_flag")' 'rule["brand_new_flag"]'; do
+  "$PY" - "$MUT/kit/templates/hooks/lodestar-guardrails.py" "$form" <<'PYEOF'
+import sys
+path, read = sys.argv[1], sys.argv[2]
+text = open(path).read()
+probe = "def _probe(rule):\n    return %s\n\n\ndef redirect_of(body):" % read
+assert "def redirect_of(body):" in text, "anchor moved — update this mutation"
+open(path, "w").write(text.replace("def redirect_of(body):", probe, 1))
+PYEOF
+  check "a new field read as $form fails validate.py" 1 "$PY" "$MUT/.github/scripts/validate.py"
+  says  "  and names COMPARED"  "\`COMPARED\` is missing 'brand_new_flag'" \
+    "$PY" "$MUT/.github/scripts/validate.py"
+  says  "  and names COPIED"    "\`COPIED\` is missing 'brand_new_flag'" \
+    "$PY" "$MUT/.github/scripts/validate.py"
+  says  "  and names §5"        "§5 does not name \`brand_new_flag\`" \
+    "$PY" "$MUT/.github/scripts/validate.py"
+  cp "$ROOT/kit/templates/hooks/lodestar-guardrails.py" "$MUT/kit/templates/hooks/"
+  check "  unmutated copy passes" 0 "$PY" "$MUT/.github/scripts/validate.py"
+done
+
 # --- 9. a missing catalog is not "everything drifted" ---------------------------------
 mv "$WS/.lodestar/catalog/guardrails" "$WS/.lodestar/catalog/guardrails-away"
 check "missing catalog exits 0"   0 "${RUN[@]}" --check

@@ -88,3 +88,9 @@ installed rule, so it also belongs in `/lodestar-guardrails` §5, in `test-catal
 — that check exists because this was missed once (`requires_manifest_missing`, PR #64). A
 new flag also needs a row in the
 `docs/EXTENDING.md` table.
+
+**Name the frontmatter dict `rule` or `fm`.** That check derives the field list by scanning
+hook source for `rule`/`fm` reads — `.get("x")` and `["x"]` both — so a field read through
+any other name (`cfg = rule; cfg.get("x")`) is invisible to it, and every site above can
+then omit the field with no gate objecting. This is a real constraint the gate rests on, not
+a style preference.
